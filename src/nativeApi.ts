@@ -17,6 +17,7 @@ type Store = {
 } & Record<Table, Row[]>;
 
 const STORAGE_KEY = 'life-system-native-store-v1';
+const UPDATED_AT_KEY = 'life-system-native-updated-at-v1';
 const tables: Table[] = [
   'daily_checkins', 'urge_logs', 'finance_entries', 'body_logs', 'career_logs',
   'reviews', 'checklist_items', 'todo_items', 'notes',
@@ -75,8 +76,12 @@ function load(): Store {
   }
 }
 
-function persist(store: Store): void {
+function persist(store: Store, modified = false): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+  if (modified) {
+    localStorage.setItem(UPDATED_AT_KEY, String(Date.now()));
+    window.dispatchEvent(new CustomEvent('life-system-data-changed', { detail: { source: 'local' } }));
+  }
 }
 
 function insert(store: Store, table: Table, values: Record<string, unknown>): Row {
@@ -248,6 +253,7 @@ function remove(store: Store, path: string): unknown {
 
 export async function nativeRequest<T>(rawPath: string, method: string, data?: unknown): Promise<T> {
   const store = load();
+  const before = JSON.stringify(store);
   const url = new URL(rawPath, 'https://native.local');
   let result: unknown;
   if (method === 'GET') result = get(store, url.pathname, url.searchParams);
@@ -255,10 +261,25 @@ export async function nativeRequest<T>(rawPath: string, method: string, data?: u
   else if (method === 'PUT') result = put(store, url.pathname, (data ?? {}) as Record<string, unknown>);
   else if (method === 'DELETE') result = remove(store, url.pathname);
   else throw new Error('不支持的请求方式');
-  persist(store);
+  persist(store, method !== 'GET' || before !== JSON.stringify(store));
   return result as T;
 }
 
 export function resetNativeData(): void {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.setItem(UPDATED_AT_KEY, String(Date.now()));
+  window.dispatchEvent(new CustomEvent('life-system-data-changed', { detail: { source: 'local' } }));
+}
+
+export function exportNativeData(): { updatedAt: number; store: Store } {
+  return {
+    updatedAt: Number(localStorage.getItem(UPDATED_AT_KEY)) || 0,
+    store: load(),
+  };
+}
+
+export function importNativeData(snapshot: { updatedAt: number; store: Store }): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot.store));
+  localStorage.setItem(UPDATED_AT_KEY, String(snapshot.updatedAt));
+  window.dispatchEvent(new CustomEvent('life-system-data-changed', { detail: { source: 'remote' } }));
 }

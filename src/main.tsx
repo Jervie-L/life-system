@@ -10,12 +10,15 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Cloud,
   ClipboardCheck,
+  Copy,
   Dumbbell,
   Home,
   Menu,
   PiggyBank,
   Plus,
+  RefreshCw,
   Save,
   Settings,
   ShieldCheck,
@@ -24,6 +27,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import { nativeRequest, resetNativeData } from './nativeApi';
+import { clearSyncCode, generateSyncCode, getSyncCode, getSyncStatus, initializeDataSync, setSyncCode, syncNow, SYNC_STATUS_EVENT } from './sync';
 
 type Summary = {
   settings: Record<string, string>;
@@ -274,6 +278,11 @@ function App() {
 
   useEffect(() => {
     refresh();
+  }, []);
+
+  useEffect(() => {
+    if (!useLocalStorage) return;
+    return initializeDataSync(refresh);
   }, []);
 
   const notify = (message: string) => {
@@ -1197,6 +1206,7 @@ function SettingsPage({ summary, onSaved, notify }: { summary: Summary; onSaved:
         onChange={v => setForm({ ...form, privacy_mode: v ? '1' : '0' })}
       />
     </div>
+    {useLocalStorage && <SyncSettings notify={notify} />}
     {useLocalStorage
       ? <div className="note settings-note">
           数据仅保存在这台设备上。
@@ -1205,6 +1215,68 @@ function SettingsPage({ summary, onSaved, notify }: { summary: Summary; onSaved:
         </div>
       : <div className="note settings-note">数据库在 <code>life-web\data\life_system.sqlite3</code>，定期复制这个文件即可备份。</div>}
   </section>;
+}
+
+function SyncSettings({ notify }: { notify: (message: string) => void }) {
+  const [code, setCode] = useState(getSyncCode());
+  const [status, setStatus] = useState(getSyncStatus());
+
+  useEffect(() => {
+    const update = (event: Event) => setStatus((event as CustomEvent).detail);
+    window.addEventListener(SYNC_STATUS_EVENT, update);
+    return () => window.removeEventListener(SYNC_STATUS_EVENT, update);
+  }, []);
+
+  const saveCode = async () => {
+    setSyncCode(code);
+    notify(code.trim() ? '同步码已保存。' : '已关闭同步。');
+    if (code.trim()) await syncNow({ preferRemote: true });
+  };
+
+  const createCode = async () => {
+    const value = generateSyncCode();
+    setCode(value);
+    setSyncCode(value);
+    notify('已生成新的同步码，请在其他设备输入相同内容。');
+    await syncNow();
+  };
+
+  const copyCode = async () => {
+    if (!code.trim()) return;
+    await navigator.clipboard.writeText(code.trim());
+    notify('同步码已复制。');
+  };
+
+  const disable = () => {
+    clearSyncCode();
+    setCode('');
+    notify('已关闭这台设备的自动同步。');
+  };
+
+  return (
+    <div className="sync-card">
+      <div className="sync-card-head">
+        <div className="sync-icon"><Cloud size={18} /></div>
+        <div>
+          <strong>Web 与 PWA 加密同步</strong>
+          <p>在浏览器和安装版 PWA 中填写同一个同步码。同步内容会先在本机加密，云端只保存密文。</p>
+        </div>
+      </div>
+      <div className="sync-code-row">
+        <input value={code} onChange={event => setCode(event.target.value)} placeholder="输入已有同步码，或生成新的同步码" />
+        <button className="ghost" onClick={createCode}>生成</button>
+        <button className="ghost" onClick={copyCode} disabled={!code.trim()}><Copy size={15} /> 复制</button>
+        <button onClick={saveCode}><Save size={15} /> 保存</button>
+      </div>
+      <div className={`sync-status ${status.state}`}>
+        <span>{status.message}</span>
+        <div>
+          {status.enabled && <button className="ghost" onClick={() => syncNow()} disabled={status.state === 'syncing'}><RefreshCw size={14} /> 立即同步</button>}
+          {status.enabled && <button className="ghost danger" onClick={disable}>关闭同步</button>}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SettingSwitch({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (value: boolean) => void }) {
