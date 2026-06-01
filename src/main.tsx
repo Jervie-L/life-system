@@ -15,6 +15,7 @@ import {
   Dumbbell,
   Home,
   Menu,
+  Play,
   PiggyBank,
   Plus,
   Pencil,
@@ -22,7 +23,9 @@ import {
   Save,
   Settings,
   ShieldCheck,
+  TimerReset,
   Trash2,
+  Volume2,
   X,
 } from 'lucide-react';
 import './styles.css';
@@ -149,14 +152,6 @@ type Note = {
   content: string;
   tags: string;
   updated_at: string;
-};
-
-type ChecklistItem = {
-  id: number;
-  system: string;
-  title: string;
-  is_done: number;
-  completed_at: string | null;
 };
 
 const api = {
@@ -372,7 +367,7 @@ function App() {
         {summary && page === 'dashboard' && <Dashboard summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'today' && <TodayForm summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'calendar' && <CalendarPage onSaved={refresh} notify={notify} />}
-        {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} />}
+        {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'finance' && <Finance onSaved={refresh} notify={notify} />}
         {summary && page === 'body' && <Body onSaved={refresh} />}
         {summary && page === 'career' && <Career onSaved={refresh} />}
@@ -826,16 +821,31 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-function SelfControl({ summary, onSaved }: { summary: Summary; onSaved: () => void }) {
+const motivationTracks = [
+  { file: '1.mp3', text: '守住今天，不给冲动任何借口。' },
+  { file: '2.mp3', text: '短暂的冲动会过去，清醒和自尊会留下。' },
+  { file: '3.mp3', text: '现在立刻离开触发环境，把注意力交还给自己。' },
+  { file: '4.mp3', text: '坚持不是等待感觉变好，而是在当下做正确的动作。' },
+  { file: '5.mp3', text: '你只需要赢下眼前这十分钟。' },
+];
+
+function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: () => void; notify: (message: string) => void }) {
   const [logs, setLogs] = useState<any[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [form, setForm] = useState({ logged_at: new Date().toISOString().slice(0, 16).replace('T', ' '), urge_score: 5, location: '', before_urge: '', feeling: '', delay_action: '', result: '' });
+  const [motivationIndex, setMotivationIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [emergencySeconds, setEmergencySeconds] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const load = async () => {
     setLogs(await api.get('/api/urge-logs'));
-    setChecklist(await api.get('/api/checklist'));
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (emergencySeconds === null || emergencySeconds <= 0) return;
+    const timer = window.setInterval(() => setEmergencySeconds(seconds => seconds === null ? null : Math.max(seconds - 1, 0)), 1000);
+    return () => window.clearInterval(timer);
+  }, [emergencySeconds]);
 
   const save = async () => {
     await api.send('/api/urge-logs', 'POST', form);
@@ -844,9 +854,18 @@ function SelfControl({ summary, onSaved }: { summary: Summary; onSaved: () => vo
     onSaved();
   };
 
-  const toggleItem = async (item: ChecklistItem) => {
-    await api.send(`/api/checklist/${item.id}`, 'PUT', { is_done: item.is_done ? 0 : 1 });
-    await load();
+  const playMotivation = async () => {
+    const next = motivationTracks.length === 1 ? 0 : (motivationIndex + 1 + Math.floor(Math.random() * (motivationTracks.length - 1))) % motivationTracks.length;
+    const audio = audioRef.current;
+    if (!audio) return;
+    setMotivationIndex(next);
+    audio.src = `/audio/motivation/${motivationTracks[next].file}`;
+    try {
+      await audio.play();
+      setIsPlaying(true);
+    } catch {
+      notify('音频播放失败，请确认浏览器允许播放声音。');
+    }
   };
 
   return (
@@ -870,23 +889,75 @@ function SelfControl({ summary, onSaved }: { summary: Summary; onSaved: () => vo
             <Field label="结果" className="field-long"><textarea value={form.result} onChange={e => setForm({ ...form, result: e.target.value })} placeholder="10分钟后冲动下降了吗？下一步是什么？" /></Field>
           </div>
         </div>
-        <div className="panel">
-          <div className="panel-head"><h3>强阻断清单</h3></div>
-          <div className="checklist">
-            {checklist.filter(i => i.system === '自控系统').length === 0 && (
-              <div className="empty-state">暂无清单。系统会在数据库初始化时生成默认阻断项。</div>
-            )}
-            {checklist.filter(i => i.system === '自控系统').map(item => (
-              <button key={item.id} className={item.is_done ? 'checked' : ''} onClick={() => toggleItem(item)}>
-                <CheckCircle2 size={18} /> {item.title}
-              </button>
-            ))}
+        <div className="stack">
+          <div className="panel motivation-panel">
+            <div className="panel-head"><h3>守住当下</h3><span>随机激励语音</span></div>
+            <p>{motivationTracks[motivationIndex].text}</p>
+            <button className="motivation-play" onClick={playMotivation}><Volume2 size={18} /> {isPlaying ? '随机播放另一段' : '播放一段激励语音'}</button>
+            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+          </div>
+          <div className={`panel emergency-panel ${emergencySeconds !== null ? 'active' : ''}`}>
+            <div className="panel-head"><h3>10 分钟应急模式</h3><TimerReset size={19} /></div>
+            {emergencySeconds === null
+              ? <><p>冲动出现时立即启动。先离开触发环境，再完成一个替代动作。</p><button onClick={() => setEmergencySeconds(600)}><Play size={17} /> 启动应急模式</button></>
+              : <><strong className="emergency-timer">{formatCountdown(emergencySeconds)}</strong><div className="emergency-actions"><span>1. 离开当前环境</span><span>2. 手机放到远处</span><span>3. 喝水、散步或深蹲</span></div><button className="ghost" onClick={() => setEmergencySeconds(null)}>结束应急模式</button></>}
           </div>
         </div>
+      </div>
+      <div className="grid two self-control-insights">
+        <StableCalendar checkins={summary.recent_checkins} logs={logs} />
+        <RiskInsights logs={logs} />
       </div>
       <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onDeleted={load} />
     </section>
   );
+}
+
+function formatCountdown(seconds: number) {
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function StableCalendar({ checkins, logs }: { checkins: DailyCheckin[]; logs: Array<{ logged_at?: string }> }) {
+  const checkinMap = new Map(checkins.map(item => [item.entry_date, item]));
+  const urgeDates = new Set(logs.map(log => String(log.logged_at || '').slice(0, 10)));
+  const days = Array.from({ length: 30 }, (_, index) => {
+    const day = new Date();
+    day.setDate(day.getDate() - (29 - index));
+    const key = day.toLocaleDateString('en-CA');
+    const checkin = checkinMap.get(key);
+    const state = checkin?.self_control_breach ? 'breach' : urgeDates.has(key) ? 'urge' : checkin ? 'stable' : 'empty';
+    return { key, label: `${day.getMonth() + 1}/${day.getDate()}`, state };
+  });
+  return <div className="panel">
+    <div className="panel-head"><h3>最近 30 天稳定日历</h3><span>每天守住一次</span></div>
+    <div className="stability-calendar">{days.map(day => <div className={`stability-day ${day.state}`} key={day.key} title={`${day.key} ${stabilityLabels[day.state]}`}><i /><small>{day.label}</small></div>)}</div>
+    <div className="stability-legend"><span><i className="stable" />稳定</span><span><i className="urge" />有冲动</span><span><i className="breach" />破戒</span><span><i className="empty" />未记录</span></div>
+  </div>;
+}
+
+const stabilityLabels: Record<string, string> = { stable: '稳定', urge: '有冲动但未破戒', breach: '破戒', empty: '未记录' };
+
+function RiskInsights({ logs }: { logs: Array<{ logged_at?: string; location?: string; before_urge?: string; delay_action?: string }> }) {
+  const recent = logs.slice(0, 30);
+  const highRiskHour = mostCommon(recent.map(log => {
+    const hour = Number(String(log.logged_at || '').slice(11, 13));
+    return Number.isNaN(hour) ? '' : `${String(hour).padStart(2, '0')}:00 - ${String((hour + 1) % 24).padStart(2, '0')}:00`;
+  }));
+  const cards = [
+    ['高危时段', highRiskHour],
+    ['高频地点', mostCommon(recent.map(log => log.location || ''))],
+    ['常见诱因', mostCommon(recent.map(log => log.before_urge || ''))],
+    ['有效替代动作', mostCommon(recent.map(log => log.delay_action || ''))],
+  ];
+  return <div className="panel">
+    <div className="panel-head"><h3>高危场景摘要</h3><span>最近 {recent.length} 条记录</span></div>
+    <div className="risk-insights">{cards.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value || '等待记录'}</strong></div>)}</div>
+  </div>;
+}
+
+function mostCommon(values: string[]) {
+  const counts = values.map(value => value.trim()).filter(Boolean).reduce<Record<string, number>>((result, value) => ({ ...result, [value]: (result[value] || 0) + 1 }), {});
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
 function maxUrgeScore(logs: Array<{ urge_score?: number }>) {

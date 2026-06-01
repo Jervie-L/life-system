@@ -545,6 +545,141 @@ button.ghost,
   min-height: 78px;
 }
 
+.motivation-panel {
+  background:
+    radial-gradient(circle at top right, rgba(255, 233, 163, 0.45), transparent 14rem),
+    linear-gradient(145deg, #f8fbf7, #eef7f1);
+}
+
+.motivation-panel p,
+.emergency-panel p {
+  margin: 0 0 16px;
+  color: var(--ink);
+  line-height: 1.8;
+}
+
+.motivation-play {
+  width: 100%;
+  justify-content: center;
+}
+
+.emergency-panel {
+  border-color: rgba(193, 117, 45, 0.2);
+  background: #fffaf3;
+}
+
+.emergency-panel.active {
+  border-color: rgba(193, 117, 45, 0.42);
+  box-shadow: 0 10px 28px rgba(193, 117, 45, 0.12);
+}
+
+.emergency-timer {
+  display: block;
+  margin: 2px 0 14px;
+  color: #a75c20;
+  font-size: 42px;
+  letter-spacing: 0.08em;
+}
+
+.emergency-actions {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.emergency-actions span {
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #694526;
+}
+
+.stability-calendar {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stability-day {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+
+.stability-day i,
+.stability-legend i {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: #e5ebe7;
+}
+
+.stability-day small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.stability-day.stable i,
+.stability-legend i.stable {
+  background: #61a87d;
+}
+
+.stability-day.urge i,
+.stability-legend i.urge {
+  background: #e3b956;
+}
+
+.stability-day.breach i,
+.stability-legend i.breach {
+  background: #d9786d;
+}
+
+.stability-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stability-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stability-legend i {
+  width: 11px;
+  height: 11px;
+}
+
+.risk-insights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.risk-insights div {
+  display: grid;
+  gap: 6px;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+
+.risk-insights small {
+  color: var(--muted);
+}
+
+.risk-insights strong {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
 .body-record-form {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
@@ -2291,6 +2426,14 @@ code {
 
   .weight-chart {
     min-width: 520px;
+  }
+
+  .self-control-insights {
+    gap: 14px;
+  }
+
+  .stability-calendar {
+    gap: 6px;
   }
 
   tr {
