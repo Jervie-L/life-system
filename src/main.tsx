@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Cloud,
   ClipboardCheck,
-  Copy,
   Dumbbell,
   Home,
   Menu,
@@ -27,7 +26,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import { nativeRequest, resetNativeData } from './nativeApi';
-import { clearSyncCode, generateSyncCode, getSyncCode, getSyncStatus, initializeDataSync, setSyncCode, syncNow, SYNC_STATUS_EVENT } from './sync';
+import { getSyncStatus, getSyncUsername, initializeDataSync, isSyncLoggedIn, loginSyncAccount, logoutSyncAccount, registerSyncAccount, syncNow, SYNC_STATUS_EVENT } from './sync';
 
 type Summary = {
   settings: Record<string, string>;
@@ -1218,8 +1217,10 @@ function SettingsPage({ summary, onSaved, notify }: { summary: Summary; onSaved:
 }
 
 function SyncSettings({ notify }: { notify: (message: string) => void }) {
-  const [code, setCode] = useState(getSyncCode());
   const [status, setStatus] = useState(getSyncStatus());
+  const [loggedIn, setLoggedIn] = useState(isSyncLoggedIn());
+  const [username, setUsername] = useState(getSyncUsername());
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     const update = (event: Event) => setStatus((event as CustomEvent).detail);
@@ -1227,30 +1228,35 @@ function SyncSettings({ notify }: { notify: (message: string) => void }) {
     return () => window.removeEventListener(SYNC_STATUS_EVENT, update);
   }, []);
 
-  const saveCode = async () => {
-    setSyncCode(code);
-    notify(code.trim() ? '同步码已保存。' : '已关闭同步。');
-    if (code.trim()) await syncNow({ preferRemote: true });
+  const login = async () => {
+    try {
+      await loginSyncAccount(username, password);
+      setUsername(getSyncUsername());
+      setPassword('');
+      setLoggedIn(true);
+      notify('已登录同步账号。');
+    } catch {
+      // The sync status event presents the server validation error.
+    }
   };
 
-  const createCode = async () => {
-    const value = generateSyncCode();
-    setCode(value);
-    setSyncCode(value);
-    notify('已生成新的同步码，请在其他设备输入相同内容。');
-    await syncNow();
+  const register = async () => {
+    try {
+      await registerSyncAccount(username, password);
+      setUsername(getSyncUsername());
+      setPassword('');
+      setLoggedIn(true);
+      notify('同步账号已创建。');
+    } catch {
+      // The sync status event presents the server validation error.
+    }
   };
 
-  const copyCode = async () => {
-    if (!code.trim()) return;
-    await navigator.clipboard.writeText(code.trim());
-    notify('同步码已复制。');
-  };
-
-  const disable = () => {
-    clearSyncCode();
-    setCode('');
-    notify('已关闭这台设备的自动同步。');
+  const logout = async () => {
+    await logoutSyncAccount();
+    setLoggedIn(false);
+    setPassword('');
+    notify('已退出同步账号。');
   };
 
   return (
@@ -1259,20 +1265,22 @@ function SyncSettings({ notify }: { notify: (message: string) => void }) {
         <div className="sync-icon"><Cloud size={18} /></div>
         <div>
           <strong>Web 与 PWA 加密同步</strong>
-          <p>在浏览器和安装版 PWA 中填写同一个同步码。同步内容会先在本机加密，云端只保存密文。</p>
+          <p>在浏览器和安装版 PWA 中登录同一个账号即可同步。密码用于本机加密和登录校验，云端只保存密文。</p>
         </div>
       </div>
-      <div className="sync-code-row">
-        <input value={code} onChange={event => setCode(event.target.value)} placeholder="输入已有同步码，或生成新的同步码" />
-        <button className="ghost" onClick={createCode}>生成</button>
-        <button className="ghost" onClick={copyCode} disabled={!code.trim()}><Copy size={15} /> 复制</button>
-        <button onClick={saveCode}><Save size={15} /> 保存</button>
-      </div>
+      {loggedIn
+        ? <div className="sync-account-row"><strong>已登录：{getSyncUsername()}</strong></div>
+        : <div className="sync-code-row">
+            <input value={username} onChange={event => setUsername(event.target.value)} placeholder="账号：3-32 位字母、数字、下划线或短横线" autoCapitalize="none" />
+            <input type="password" value={password} onChange={event => setPassword(event.target.value)} placeholder="密码：至少 8 位" />
+            <button className="ghost" onClick={register} disabled={!username.trim() || password.length < 8}>注册</button>
+            <button onClick={login} disabled={!username.trim() || password.length < 8}>登录</button>
+          </div>}
       <div className={`sync-status ${status.state}`}>
         <span>{status.message}</span>
         <div>
-          {status.enabled && <button className="ghost" onClick={() => syncNow()} disabled={status.state === 'syncing'}><RefreshCw size={14} /> 立即同步</button>}
-          {status.enabled && <button className="ghost danger" onClick={disable}>关闭同步</button>}
+          {loggedIn && <button className="ghost" onClick={() => syncNow()} disabled={status.state === 'syncing'}><RefreshCw size={14} /> 立即同步</button>}
+          {loggedIn && <button className="ghost danger" onClick={logout}>退出账号</button>}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 # Cloudflare Pages 加密同步部署
 
-Web 与 PWA 的自动同步依赖 Pages Functions 和 Workers KV。同步数据在浏览器内使用 AES-GCM 加密，KV 中只保存密文。
+Web 与 PWA 的自动同步依赖 Pages Functions 和 Workers KV。用户通过账号登录匹配同步空间。同步数据在浏览器内使用 AES-GCM 加密，KV 中只保存密文。
 
 ## 创建 KV
 
@@ -45,8 +45,8 @@ npx wrangler pages deploy dist --project-name life-system-pwa
 部署完成后：
 
 1. 在 Web 页面进入 `设置`。
-2. 点击 `生成`，保存同步码。
-3. 在安装版 PWA 的 `设置` 中填写相同同步码并保存。
+2. 注册同步账号。
+3. 在安装版 PWA 的 `设置` 中登录相同账号。
 4. 页面启动、回到前台和本机数据变更后会自动同步，也可以点击 `立即同步`。
 
-同步码等同于数据解密密钥。不要公开，不要提交到 GitHub。
+账号密码用于登录校验，也用于在设备本地派生数据加密密钥。密码不会以明文保存到 KV。忘记密码后无法解密已有云端数据，请妥善保存。
