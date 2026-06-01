@@ -2,6 +2,7 @@ type Row = Record<string, unknown> & { id: number };
 type Table =
   | 'daily_checkins'
   | 'urge_logs'
+  | 'finance_accounts'
   | 'finance_entries'
   | 'body_logs'
   | 'career_logs'
@@ -11,7 +12,7 @@ type Table =
   | 'notes';
 
 type Store = {
-  version: 1;
+  version: 2;
   settings: Record<string, string>;
   counters: Record<Table, number>;
 } & Record<Table, Row[]>;
@@ -19,7 +20,7 @@ type Store = {
 const STORAGE_KEY = 'life-system-native-store-v1';
 const UPDATED_AT_KEY = 'life-system-native-updated-at-v1';
 const tables: Table[] = [
-  'daily_checkins', 'urge_logs', 'finance_entries', 'body_logs', 'career_logs',
+  'daily_checkins', 'urge_logs', 'finance_accounts', 'finance_entries', 'body_logs', 'career_logs',
   'reviews', 'checklist_items', 'todo_items', 'notes',
 ];
 
@@ -45,7 +46,7 @@ const boolInt = (value: unknown) => value === true || value === 1 || value === '
 function initialStore(): Store {
   const counters = Object.fromEntries(tables.map((table) => [table, 0])) as Record<Table, number>;
   const store = {
-    version: 1 as const,
+    version: 2 as const,
     settings: {
       target_savings: '400000',
       initial_savings: '250000',
@@ -59,10 +60,11 @@ function initialStore(): Store {
       today_goal_text: '先完成系统，不追求完美。',
     },
     counters,
-    daily_checkins: [], urge_logs: [], finance_entries: [], body_logs: [],
+    daily_checkins: [], urge_logs: [], finance_accounts: [], finance_entries: [], body_logs: [],
     career_logs: [], reviews: [], checklist_items: [], todo_items: [], notes: [],
   } satisfies Store;
   checklistDefaults.forEach(([system, title]) => insert(store, 'checklist_items', { system, title, is_done: 0, completed_at: null }));
+  insert(store, 'finance_accounts', { name: '主要银行账户', account_type: '银行账户', opening_balance: 250000 });
   return store;
 }
 
@@ -70,10 +72,28 @@ function load(): Store {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return initialStore();
   try {
-    return JSON.parse(raw) as Store;
+    const store = migrateStore(JSON.parse(raw) as Store);
+    if (raw !== JSON.stringify(store)) localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    return store;
   } catch {
     return initialStore();
   }
+}
+
+function migrateStore(store: Store): Store {
+  if (!Array.isArray(store.finance_accounts)) {
+    store.finance_accounts = [];
+    store.counters.finance_accounts = 0;
+  }
+  if (!store.finance_accounts.length) {
+    insert(store, 'finance_accounts', { name: '主要银行账户', account_type: '银行账户', opening_balance: number(store.settings.initial_savings) });
+  }
+  const defaultAccountId = store.finance_accounts[0].id;
+  store.finance_entries.forEach((row) => {
+    if (!number(row.account_id)) row.account_id = defaultAccountId;
+  });
+  store.version = 2;
+  return store;
 }
 
 function persist(store: Store, modified = false): void {
@@ -133,8 +153,8 @@ function summary(store: Store) {
     spent: store.finance_entries.filter((row) => row.type === '支出').reduce((sum, row) => sum + number(row.amount), 0),
     income: store.finance_entries.filter((row) => row.type === '收入').reduce((sum, row) => sum + number(row.amount), 0),
   };
-  const initial = number(settings.initial_savings);
   const target = number(settings.target_savings);
+  const initial = store.finance_accounts.reduce((sum, row) => sum + number(row.opening_balance), 0);
   const total = initial + finance.saved + finance.income - finance.spent;
   const weekStart = new Date();
   weekStart.setDate(weekStart.getDate() - 6);
@@ -183,6 +203,14 @@ function get(store: Store, path: string, params: URLSearchParams): unknown {
     return store.todo_items.filter((item) => text(item.todo_date) >= start && text(item.todo_date) <= end).sort((a, b) => text(a.todo_date).localeCompare(text(b.todo_date)) || a.id - b.id);
   }
   if (path === '/api/review-draft') return reviewDraft(store, params.get('type') ?? 'week');
+  if (path === '/api/finance-accounts') {
+    return store.finance_accounts
+      .map((account): Row => {
+        const balance = store.finance_entries.filter((row) => number(row.account_id) === account.id).reduce((sum, row) => sum + financeDelta(row), number(account.opening_balance));
+        return { ...account, balance };
+      })
+      .sort((a, b) => accountTypeOrder(text(a['account_type'])) - accountTypeOrder(text(b['account_type'])) || a.id - b.id);
+  }
   const map: Record<string, Table> = {
     '/api/daily-checkins': 'daily_checkins', '/api/urge-logs': 'urge_logs', '/api/finance': 'finance_entries',
     '/api/body': 'body_logs', '/api/career': 'career_logs', '/api/reviews': 'reviews',
@@ -191,6 +219,9 @@ function get(store: Store, path: string, params: URLSearchParams): unknown {
   const table = map[path];
   if (!table) throw new Error('接口不存在');
   let rows = [...store[table]];
+  if (table === 'finance_entries') {
+    rows = rows.map((row) => ({ ...row, account_name: text(store.finance_accounts.find((account) => account.id === number(row.account_id))?.name, '未分类账户') }));
+  }
   if (table === 'notes' && params.get('q')) {
     const keyword = text(params.get('q')).toLowerCase();
     rows = rows.filter((row) => `${text(row.title)} ${text(row.content)} ${text(row.tags)}`.toLowerCase().includes(keyword));
@@ -209,7 +240,8 @@ function post(store: Store, path: string, data: Record<string, unknown>): unknow
   }
   const handlers: Record<string, () => Row> = {
     '/api/urge-logs': () => insert(store, 'urge_logs', { ...data, logged_at: text(data.logged_at, timestamp()), urge_score: number(data.urge_score) }),
-    '/api/finance': () => insert(store, 'finance_entries', { ...data, entry_date: text(data.entry_date, today()), type: text(data.type, '支出'), amount: number(data.amount) }),
+    '/api/finance-accounts': () => insert(store, 'finance_accounts', { name: required(data.name, '账户名称不能为空'), account_type: text(data.account_type, '银行账户'), opening_balance: number(data.opening_balance) }),
+    '/api/finance': () => insert(store, 'finance_entries', { ...data, entry_date: text(data.entry_date, today()), type: text(data.type, '支出'), amount: number(data.amount), account_id: requiredAccountId(store, data.account_id) }),
     '/api/body': () => insert(store, 'body_logs', { ...data, entry_date: text(data.entry_date, today()), weight: optionalNumber(data.weight), sleep_hours: optionalNumber(data.sleep_hours), exercise_minutes: number(data.exercise_minutes), stayed_up_late: boolInt(data.stayed_up_late), posture_training: boolInt(data.posture_training) }),
     '/api/career': () => insert(store, 'career_logs', { ...data, entry_date: text(data.entry_date, today()), learning_minutes: number(data.learning_minutes) }),
     '/api/reviews': () => insert(store, 'reviews', { ...data, review_type: text(data.review_type, '周复盘'), period_start: text(data.period_start, today()), period_end: text(data.period_end, today()) }),
@@ -225,6 +257,21 @@ function required(value: unknown, message: string): string {
   const result = text(value).trim();
   if (!result) throw new Error(message);
   return result;
+}
+
+function requiredAccountId(store: Store, value: unknown): number {
+  const accountId = number(value);
+  if (!store.finance_accounts.some((account) => account.id === accountId)) throw new Error('请选择有效的资金账户');
+  return accountId;
+}
+
+function financeDelta(row: Row): number {
+  return row.type === '支出' ? -number(row.amount) : number(row.amount);
+}
+
+function accountTypeOrder(value: string): number {
+  const index = ['银行账户', '现金', '保险'].indexOf(value);
+  return index === -1 ? 99 : index;
 }
 
 function put(store: Store, path: string, data: Record<string, unknown>): unknown {
@@ -244,9 +291,10 @@ function put(store: Store, path: string, data: Record<string, unknown>): unknown
 }
 
 function remove(store: Store, path: string): unknown {
-  const match = path.match(/^\/api\/(daily-checkins|urge-logs|finance|body|career|reviews|checklist|todos|notes)\/(\d+)$/);
+  const match = path.match(/^\/api\/(daily-checkins|urge-logs|finance-accounts|finance|body|career|reviews|checklist|todos|notes)\/(\d+)$/);
   if (!match) throw new Error('接口不存在');
-  const table = ({ 'daily-checkins': 'daily_checkins', 'urge-logs': 'urge_logs', finance: 'finance_entries', body: 'body_logs', career: 'career_logs', reviews: 'reviews', checklist: 'checklist_items', todos: 'todo_items', notes: 'notes' } as const)[match[1] as 'daily-checkins'];
+  const table: Table = ({ 'daily-checkins': 'daily_checkins', 'urge-logs': 'urge_logs', 'finance-accounts': 'finance_accounts', finance: 'finance_entries', body: 'body_logs', career: 'career_logs', reviews: 'reviews', checklist: 'checklist_items', todos: 'todo_items', notes: 'notes' } as Record<string, Table>)[match[1]];
+  if (table === 'finance_accounts' && store.finance_entries.some((row) => number(row.account_id) === Number(match[2]))) throw new Error('该账户已有财务记录，不能删除');
   store[table] = store[table].filter((row) => row.id !== Number(match[2]));
   return { ok: true };
 }
@@ -279,7 +327,7 @@ export function exportNativeData(): { updatedAt: number; store: Store } {
 }
 
 export function importNativeData(snapshot: { updatedAt: number; store: Store }): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot.store));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(migrateStore(snapshot.store)));
   localStorage.setItem(UPDATED_AT_KEY, String(snapshot.updatedAt));
   window.dispatchEvent(new CustomEvent('life-system-data-changed', { detail: { source: 'remote' } }));
 }

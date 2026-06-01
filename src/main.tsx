@@ -94,8 +94,18 @@ type FinanceEntry = {
   entry_date: string;
   type: string;
   amount: number;
+  account_id: number;
+  account_name: string;
   category: string;
   note: string;
+};
+
+type FinanceAccount = {
+  id: number;
+  name: string;
+  account_type: '银行账户' | '现金' | '保险';
+  opening_balance: number;
+  balance: number;
 };
 
 type BodyLog = {
@@ -192,6 +202,10 @@ const columnLabels: Record<string, string> = {
   entry_date: '日期',
   type: '类型',
   amount: '金额',
+  account_name: '资金账户',
+  account_type: '账户类型',
+  opening_balance: '期初余额',
+  balance: '当前余额',
   category: '分类',
   note: '备注',
   weight: '体重',
@@ -358,7 +372,7 @@ function App() {
         {summary && page === 'today' && <TodayForm summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'calendar' && <CalendarPage onSaved={refresh} notify={notify} />}
         {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} />}
-        {summary && page === 'finance' && <Finance onSaved={refresh} />}
+        {summary && page === 'finance' && <Finance onSaved={refresh} notify={notify} />}
         {summary && page === 'body' && <Body onSaved={refresh} />}
         {summary && page === 'career' && <Career onSaved={refresh} />}
         {summary && page === 'notes' && <Notes />}
@@ -890,23 +904,103 @@ function weeklyUrgeCount(logs: Array<{ logged_at?: string }>) {
   }).length;
 }
 
-function Finance({ onSaved }: { onSaved: () => void }) {
+function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: string) => void }) {
   const [rows, setRows] = useState<FinanceEntry[]>([]);
-  const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, category: '', note: '' });
-  const load = async () => setRows(await api.get('/api/finance'));
+  const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
+  const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: '', note: '' });
+  const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], opening_balance: 0 });
+  const load = async () => {
+    const [nextRows, nextAccounts] = await Promise.all([
+      api.get<FinanceEntry[]>('/api/finance'),
+      api.get<FinanceAccount[]>('/api/finance-accounts'),
+    ]);
+    setRows(nextRows);
+    setAccounts(nextAccounts);
+    setForm(current => current.account_id || !nextAccounts.length ? current : { ...current, account_id: nextAccounts[0].id });
+  };
   useEffect(() => { load(); }, []);
   const save = async () => {
     await api.send('/api/finance', 'POST', form);
     setForm({ ...form, amount: 0, category: '', note: '' });
     await load(); onSaved();
   };
-  return <RecordPage title="新增财务记录" button="保存记录" form={<>
-    <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-    <Field label="类型"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option>支出</option><option>收入</option><option>存款</option></select></Field>
-    <Field label="金额"><NumberInput value={form.amount} onChange={value => setForm({ ...form, amount: value })} /></Field>
-    <Field label="分类"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></Field>
-    <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
-  </>} onSave={save} table={<DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'category', 'note']} endpoint="/api/finance" onDeleted={load} />} />;
+  const saveAccount = async () => {
+    await api.send('/api/finance-accounts', 'POST', accountForm);
+    setAccountForm({ ...accountForm, name: '', opening_balance: 0 });
+    await load(); onSaved();
+  };
+  const removeAccount = async (id: number) => {
+    try {
+      await api.send(`/api/finance-accounts/${id}`, 'DELETE');
+      await load(); onSaved();
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '账户删除失败');
+    }
+  };
+  const totals = financeTypeTotals(accounts);
+  return <section className="stack">
+    <div className="grid four">
+      <Metric icon={<PiggyBank />} label="目前存款" value={money(totals.total)} hint={`${accounts.length} 个资金账户`} />
+      <Metric icon={<PiggyBank />} label="银行账户" value={money(totals['银行账户'])} hint="银行卡及储蓄账户" />
+      <Metric icon={<PiggyBank />} label="现金" value={money(totals['现金'])} hint="随身及备用现金" />
+      <Metric icon={<PiggyBank />} label="保险" value={money(totals['保险'])} hint="保险现金价值" />
+    </div>
+    <div className="finance-overview">
+      <div className="panel">
+        <div className="panel-head"><h3>存款分布</h3><span>{money(totals.total)}</span></div>
+        <FinancePie totals={totals} />
+      </div>
+      <div className="panel">
+        <div className="panel-head"><h3>资金账户</h3><span>{accounts.length} 个</span></div>
+        <div className="finance-account-list">
+          {accounts.map(account => <div className="finance-account" key={account.id}>
+            <span className={`finance-dot finance-dot-${account.account_type}`} />
+            <div><strong>{account.name}</strong><small>{account.account_type}</small></div>
+            <b>{money(account.balance)}</b>
+            <button className="icon danger" onClick={() => removeAccount(account.id)} title="删除账户"><Trash2 size={15} /></button>
+          </div>)}
+        </div>
+      </div>
+    </div>
+    <RecordPage title="新增资金账户" button="添加账户" form={<>
+      <Field label="账户名称"><input value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="例如：招商银行工资卡" /></Field>
+      <Field label="账户类型"><select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value as FinanceAccount['account_type'] })}><option>银行账户</option><option>现金</option><option>保险</option></select></Field>
+      <Field label="期初余额"><NumberInput value={accountForm.opening_balance} onChange={opening_balance => setAccountForm({ ...accountForm, opening_balance })} /></Field>
+    </>} onSave={saveAccount} table={null} />
+    <RecordPage title="新增财务记录" button="保存记录" form={<>
+      <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
+      <Field label="类型"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option>支出</option><option>收入</option><option>存款</option></select></Field>
+      <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
+      <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
+      <Field label="分类"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></Field>
+      <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
+    </>} onSave={save} table={<DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onDeleted={async () => { await load(); onSaved(); }} />} />
+  </section>;
+}
+
+function financeTypeTotals(accounts: FinanceAccount[]) {
+  const totals = { '银行账户': 0, '现金': 0, '保险': 0, total: 0 };
+  accounts.forEach(account => {
+    totals[account.account_type] += Number(account.balance || 0);
+    totals.total += Number(account.balance || 0);
+  });
+  return totals;
+}
+
+function FinancePie({ totals }: { totals: ReturnType<typeof financeTypeTotals> }) {
+  const types = ['银行账户', '现金', '保险'] as const;
+  const colors = { '银行账户': '#207456', '现金': '#d4a54f', '保险': '#7193b5' };
+  const chartTotal = types.reduce((sum, type) => sum + Math.max(totals[type], 0), 0);
+  let cursor = 0;
+  const stops = types.map(type => {
+    const start = cursor;
+    cursor += chartTotal > 0 ? Math.max(totals[type], 0) / chartTotal * 100 : 0;
+    return `${colors[type]} ${start}% ${cursor}%`;
+  });
+  return <div className="finance-pie-layout">
+    <div className="finance-pie" style={{ background: chartTotal > 0 ? `conic-gradient(${stops.join(', ')})` : '#e8eeea' }}><span>{money(totals.total)}</span></div>
+    <div className="finance-legend">{types.map(type => <div key={type}><i style={{ background: colors[type] }} /><span>{type}</span><strong>{money(totals[type])}</strong></div>)}</div>
+  </div>;
 }
 
 function Body({ onSaved }: { onSaved: () => void }) {
@@ -1194,7 +1288,6 @@ function SettingsPage({ summary, onSaved, notify }: { summary: Summary; onSaved:
     <div className="panel-head"><h3>目标设置</h3><button onClick={save}><Save size={16} /> 保存设置</button></div>
     <div className="form-grid settings-grid">
       <Field label="目标存款"><input value={form.target_savings || ''} onChange={e => setForm({ ...form, target_savings: e.target.value })} /></Field>
-      <Field label="初始存款"><input value={form.initial_savings || ''} onChange={e => setForm({ ...form, initial_savings: e.target.value })} /></Field>
       <Field label="30岁目标日期"><DateInput value={form.target_date || ''} onChange={target_date => setForm({ ...form, target_date })} /></Field>
       <Field label="每日运动目标分钟"><input value={form.daily_exercise_target || ''} onChange={e => setForm({ ...form, daily_exercise_target: e.target.value })} /></Field>
       <Field label="每日事业学习分钟"><input value={form.daily_career_target || ''} onChange={e => setForm({ ...form, daily_career_target: e.target.value })} /></Field>

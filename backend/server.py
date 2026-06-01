@@ -67,8 +67,17 @@ def init_db() -> None:
               entry_date TEXT NOT NULL,
               type TEXT NOT NULL,
               amount REAL NOT NULL,
+              account_id INTEGER,
               category TEXT DEFAULT '',
               note TEXT DEFAULT '',
+              created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS finance_accounts (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              account_type TEXT NOT NULL,
+              opening_balance REAL NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL
             );
 
@@ -140,6 +149,7 @@ def init_db() -> None:
         )
         seed_settings(db)
         seed_checklist(db)
+        migrate_finance_accounts(db)
 
 
 def seed_settings(db: sqlite3.Connection) -> None:
@@ -184,6 +194,23 @@ def seed_checklist(db: sqlite3.Connection) -> None:
     )
 
 
+def migrate_finance_accounts(db: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(finance_entries)").fetchall()}
+    if "account_id" not in columns:
+        db.execute("ALTER TABLE finance_entries ADD COLUMN account_id INTEGER")
+    account = db.execute("SELECT id FROM finance_accounts ORDER BY id LIMIT 1").fetchone()
+    if not account:
+        initial = db.execute("SELECT value FROM settings WHERE key = 'initial_savings'").fetchone()
+        cur = db.execute(
+            "INSERT INTO finance_accounts (name, account_type, opening_balance, created_at) VALUES (?, ?, ?, ?)",
+            ("主要银行账户", "银行账户", float(initial["value"] if initial else 0), now()),
+        )
+        account_id = cur.lastrowid
+    else:
+        account_id = account["id"]
+    db.execute("UPDATE finance_entries SET account_id = ? WHERE account_id IS NULL", (account_id,))
+
+
 def rows(query: str, args: tuple = ()) -> list[dict]:
     with connect() as db:
         return [dict(row) for row in db.execute(query, args).fetchall()]
@@ -221,7 +248,7 @@ def summary() -> dict:
     start = settings.get("self_control_start", "2026-05-24")
     end = settings.get("self_control_end", "2026-06-22")
     target = float(settings.get("target_savings", "400000"))
-    initial = float(settings.get("initial_savings", "250000"))
+    initial = one("SELECT COALESCE(SUM(opening_balance), 0) AS total FROM finance_accounts")["total"]
 
     daily = rows("SELECT * FROM daily_checkins ORDER BY entry_date DESC LIMIT 30")
     today_checkin = one("SELECT * FROM daily_checkins WHERE entry_date = ?", (today,))
@@ -264,7 +291,7 @@ def summary() -> dict:
         """,
         (start, end),
     )["count"]
-    total_savings = initial + float(finance["saved"]) + float(finance["income"]) - float(finance["spent"])
+    total_savings = float(initial) + float(finance["saved"]) + float(finance["income"]) - float(finance["spent"])
     return {
         "settings": settings,
         "today": today,
@@ -281,7 +308,7 @@ def summary() -> dict:
         },
         "finance": {
             "target": target,
-            "initial": initial,
+            "initial": float(initial),
             "saved_entries": finance["saved"],
             "spent": finance["spent"],
             "income": finance["income"],
@@ -404,7 +431,14 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/urge-logs":
                 self.send_json(rows("SELECT * FROM urge_logs ORDER BY logged_at DESC LIMIT 100"))
             elif path == "/api/finance":
-                self.send_json(rows("SELECT * FROM finance_entries ORDER BY entry_date DESC, id DESC LIMIT 200"))
+                self.send_json(rows("""
+                    SELECT finance_entries.*, finance_accounts.name AS account_name
+                    FROM finance_entries
+                    LEFT JOIN finance_accounts ON finance_accounts.id = finance_entries.account_id
+                    ORDER BY entry_date DESC, finance_entries.id DESC LIMIT 200
+                """))
+            elif path == "/api/finance-accounts":
+                self.send_json(finance_accounts())
             elif path == "/api/body":
                 self.send_json(rows("SELECT * FROM body_logs ORDER BY entry_date DESC, id DESC LIMIT 200"))
             elif path == "/api/career":
@@ -458,6 +492,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(insert_urge(data), 201)
             elif path == "/api/finance":
                 self.send_json(insert_finance(data), 201)
+            elif path == "/api/finance-accounts":
+                self.send_json(insert_finance_account(data), 201)
             elif path == "/api/body":
                 self.send_json(insert_body(data), 201)
             elif path == "/api/career":
@@ -514,6 +550,7 @@ class Handler(BaseHTTPRequestHandler):
             table_map = {
                 "/api/daily-checkins/": "daily_checkins",
                 "/api/urge-logs/": "urge_logs",
+                "/api/finance-accounts/": "finance_accounts",
                 "/api/finance/": "finance_entries",
                 "/api/body/": "body_logs",
                 "/api/career/": "career_logs",
@@ -526,6 +563,10 @@ class Handler(BaseHTTPRequestHandler):
                 if path.startswith(prefix):
                     item_id = int(path.rsplit("/", 1)[1])
                     with connect() as db:
+                        if table == "finance_accounts":
+                            linked = db.execute("SELECT COUNT(*) AS count FROM finance_entries WHERE account_id = ?", (item_id,)).fetchone()["count"]
+                            if linked:
+                                raise ValueError("该账户已有财务记录，不能删除")
                         db.execute(f"DELETE FROM {table} WHERE id = ?", (item_id,))
                     self.send_json({"ok": True})
                     return
@@ -597,22 +638,64 @@ def insert_urge(data: dict) -> dict:
 
 def insert_finance(data: dict) -> dict:
     timestamp = now()
+    account_id = int(data.get("account_id") or 0)
     with connect() as db:
+        if not db.execute("SELECT id FROM finance_accounts WHERE id = ?", (account_id,)).fetchone():
+            raise ValueError("请选择有效的资金账户")
         cur = db.execute(
             """
-            INSERT INTO finance_entries (entry_date, type, amount, category, note, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO finance_entries (entry_date, type, amount, account_id, category, note, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 data.get("entry_date") or date.today().isoformat(),
                 data.get("type", "支出"),
                 float(data.get("amount") or 0),
+                account_id,
                 data.get("category", ""),
                 data.get("note", ""),
                 timestamp,
             ),
         )
-        row = db.execute("SELECT * FROM finance_entries WHERE id = ?", (cur.lastrowid,)).fetchone()
+        row = db.execute("""
+            SELECT finance_entries.*, finance_accounts.name AS account_name
+            FROM finance_entries
+            LEFT JOIN finance_accounts ON finance_accounts.id = finance_entries.account_id
+            WHERE finance_entries.id = ?
+        """, (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def finance_accounts() -> list[dict]:
+    return rows("""
+        SELECT
+          finance_accounts.*,
+          opening_balance + COALESCE(SUM(
+            CASE WHEN finance_entries.type = '支出' THEN -finance_entries.amount ELSE finance_entries.amount END
+          ), 0) AS balance
+        FROM finance_accounts
+        LEFT JOIN finance_entries ON finance_entries.account_id = finance_accounts.id
+        GROUP BY finance_accounts.id
+        ORDER BY CASE finance_accounts.account_type
+            WHEN '银行账户' THEN 1
+            WHEN '现金' THEN 2
+            WHEN '保险' THEN 3
+            ELSE 4
+        END, finance_accounts.id
+    """)
+
+
+def insert_finance_account(data: dict) -> dict:
+    timestamp = now()
+    name = str(data.get("name", "")).strip()
+    if not name:
+        raise ValueError("账户名称不能为空")
+    with connect() as db:
+        cur = db.execute(
+            "INSERT INTO finance_accounts (name, account_type, opening_balance, created_at) VALUES (?, ?, ?, ?)",
+            (name, data.get("account_type", "银行账户"), float(data.get("opening_balance") or 0), timestamp),
+        )
+        row = db.execute("SELECT *, opening_balance AS balance FROM finance_accounts WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
 
 
