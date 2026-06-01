@@ -190,7 +190,7 @@ function apiUrl(path: string): string {
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (value: number) => `¥${Math.round(value).toLocaleString('zh-CN')}`;
+const money = (value: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const recordStartDate = '2026-06-01';
 const columnLabels: Record<string, string> = {
   logged_at: '时间',
@@ -910,7 +910,11 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: '', note: '' });
   const [editingAccountId, setEditingAccountId] = useState(0);
+  const [accountFormOpen, setAccountFormOpen] = useState(false);
+  const [activePane, setActivePane] = useState(0);
   const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], balance: 0 });
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const panes = ['存款概览', '新增流水', '财务记录'];
   const load = async () => {
     const [nextRows, nextAccounts] = await Promise.all([
       api.get<FinanceEntry[]>('/api/finance'),
@@ -924,7 +928,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const save = async () => {
     await api.send('/api/finance', 'POST', form);
     setForm({ ...form, amount: 0, category: '', note: '' });
-    await load(); onSaved();
+    await load(); onSaved(); notify('财务记录已保存。');
   };
   const saveAccount = async () => {
     if (editingAccountId) {
@@ -935,15 +939,18 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
       notify('资金账户已添加。');
     }
     setEditingAccountId(0);
+    setAccountFormOpen(false);
     setAccountForm({ ...accountForm, name: '', balance: 0 });
     await load(); onSaved();
   };
   const editAccount = (account: FinanceAccount) => {
     setEditingAccountId(account.id);
+    setAccountFormOpen(true);
     setAccountForm({ name: account.name, account_type: account.account_type, balance: account.balance });
   };
   const cancelEditAccount = () => {
     setEditingAccountId(0);
+    setAccountFormOpen(false);
     setAccountForm({ name: '', account_type: '银行账户', balance: 0 });
   };
   const removeAccount = async (id: number) => {
@@ -955,45 +962,69 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
     }
   };
   const totals = financeTypeTotals(accounts);
-  return <section className="stack">
-    <div className="grid four">
-      <Metric icon={<PiggyBank />} label="目前存款" value={money(totals.total)} hint={`${accounts.length} 个资金账户`} />
-      <Metric icon={<PiggyBank />} label="银行账户" value={money(totals['银行账户'])} hint="银行卡及储蓄账户" />
-      <Metric icon={<PiggyBank />} label="现金" value={money(totals['现金'])} hint="随身及备用现金" />
-      <Metric icon={<PiggyBank />} label="保险" value={money(totals['保险'])} hint="保险现金价值" />
+  const showPane = (index: number) => {
+    setActivePane(index);
+    const pager = pagerRef.current;
+    if (pager && window.matchMedia('(max-width: 680px)').matches) {
+      pager.scrollTo({ left: pager.clientWidth * index, behavior: 'smooth' });
+    }
+  };
+  return <section className="finance-page">
+    <div className="finance-tabs" role="tablist" aria-label="存钱系统页面">
+      {panes.map((pane, index) => <button className={activePane === index ? 'active' : ''} key={pane} onClick={() => showPane(index)}>{pane}</button>)}
     </div>
-    <div className="finance-overview">
-      <div className="panel">
-        <div className="panel-head"><h3>存款分布</h3><span>{money(totals.total)}</span></div>
-        <FinancePie totals={totals} />
-      </div>
-      <div className="panel">
-        <div className="panel-head"><h3>资金账户</h3><span>{accounts.length} 个</span></div>
-        <div className="finance-account-list">
-          {accounts.map(account => <div className="finance-account" key={account.id}>
-            <span className={`finance-dot finance-dot-${account.account_type}`} />
-            <div><strong>{account.name}</strong><small>{account.account_type}</small></div>
-            <b>{money(account.balance)}</b>
-            <button className="icon" onClick={() => editAccount(account)} title="编辑账户"><Pencil size={15} /></button>
-            <button className="icon danger" onClick={() => removeAccount(account.id)} title="删除账户"><Trash2 size={15} /></button>
-          </div>)}
+    <div className="finance-pager" ref={pagerRef} onScroll={event => {
+      const width = event.currentTarget.clientWidth;
+      if (width) setActivePane(Math.round(event.currentTarget.scrollLeft / width));
+    }}>
+      <div className="finance-pager-track">
+        <div className={`finance-pane ${activePane === 0 ? 'active' : ''}`}>
+          <div className="grid four finance-metrics">
+            <Metric icon={<PiggyBank />} label="目前存款" value={money(totals.total)} hint={`${accounts.length} 个资金账户`} />
+            <Metric icon={<PiggyBank />} label="银行账户" value={money(totals['银行账户'])} hint="银行卡及储蓄账户" />
+            <Metric icon={<PiggyBank />} label="现金" value={money(totals['现金'])} hint="随身及备用现金" />
+            <Metric icon={<PiggyBank />} label="保险" value={money(totals['保险'])} hint="保险现金价值" />
+          </div>
+          <div className="finance-overview">
+            <div className="panel">
+              <div className="panel-head"><h3>存款分布</h3><span>{money(totals.total)}</span></div>
+              <FinancePie totals={totals} />
+            </div>
+            <div className="panel">
+              <div className="panel-head"><h3>资金账户</h3><button className="ghost" onClick={() => { setEditingAccountId(0); setAccountFormOpen(true); setAccountForm({ name: '', account_type: '银行账户', balance: 0 }); }}><Plus size={15} /> 新增</button></div>
+              <div className="finance-account-list">
+                {accounts.map(account => <div className="finance-account" key={account.id}>
+                  <span className={`finance-dot finance-dot-${account.account_type}`} />
+                  <div><strong>{account.name}</strong><small>{account.account_type}</small></div>
+                  <b>{money(account.balance)}</b>
+                  <button className="icon" onClick={() => editAccount(account)} title="编辑账户"><Pencil size={15} /></button>
+                  <button className="icon danger" onClick={() => removeAccount(account.id)} title="删除账户"><Trash2 size={15} /></button>
+                </div>)}
+              </div>
+            </div>
+          </div>
+          {accountFormOpen && <RecordPage title={editingAccountId ? '修改资金账户' : '新增资金账户'} button={editingAccountId ? '保存修改' : '添加账户'} form={<>
+            <Field label="账户名称"><input value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="例如：招商银行工资卡" /></Field>
+            <Field label="账户类型"><select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value as FinanceAccount['account_type'] })}><option>银行账户</option><option>现金</option><option>保险</option></select></Field>
+            <Field label={editingAccountId ? '当前余额' : '初始余额'}><NumberInput value={accountForm.balance} onChange={balance => setAccountForm({ ...accountForm, balance })} /></Field>
+            <button className="ghost" onClick={cancelEditAccount}>取消</button>
+          </>} onSave={saveAccount} table={null} />}
+        </div>
+        <div className={`finance-pane ${activePane === 1 ? 'active' : ''}`}>
+          <RecordPage title="新增财务记录" button="保存记录" form={<>
+            <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
+            <Field label="类型"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option>支出</option><option>收入</option><option>存款</option></select></Field>
+            <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
+            <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
+            <Field label="分类"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></Field>
+            <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
+          </>} onSave={save} table={null} />
+        </div>
+        <div className={`finance-pane ${activePane === 2 ? 'active' : ''}`}>
+          <DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onDeleted={async () => { await load(); onSaved(); }} />
         </div>
       </div>
     </div>
-    <RecordPage title={editingAccountId ? '修改资金账户' : '新增资金账户'} button={editingAccountId ? '保存修改' : '添加账户'} form={<>
-      <Field label="账户名称"><input value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="例如：招商银行工资卡" /></Field>
-      <Field label="账户类型"><select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value as FinanceAccount['account_type'] })}><option>银行账户</option><option>现金</option><option>保险</option></select></Field>
-      <Field label={editingAccountId ? '当前余额' : '初始余额'}><NumberInput value={accountForm.balance} onChange={balance => setAccountForm({ ...accountForm, balance })} /></Field>
-      {editingAccountId && <button className="ghost" onClick={cancelEditAccount}>取消修改</button>}
-    </>} onSave={saveAccount} table={null} />
-    <RecordPage title="新增财务记录" button="保存记录" form={<>
-      <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-      <Field label="类型"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option>支出</option><option>收入</option><option>存款</option></select></Field>
-      <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
-      <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
-      <Field label="分类"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></Field>
-      <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
-    </>} onSave={save} table={<DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onDeleted={async () => { await load(); onSaved(); }} />} />
   </section>;
 }
 
@@ -1032,16 +1063,47 @@ function Body({ onSaved }: { onSaved: () => void }) {
     setForm({ ...form, exercise_type: '', exercise_minutes: 0, note: '' });
     await load(); onSaved();
   };
-  return <RecordPage title="新增身体记录" button="保存记录" className="body-record-form" form={<>
-    <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-    <Field label="体重"><input value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} placeholder="例如 65.5" /></Field>
-    <Field label="运动类型"><input value={form.exercise_type} onChange={e => setForm({ ...form, exercise_type: e.target.value })} placeholder="力量 / 快走 / 拉伸" /></Field>
-    <Field label="运动分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
-    <Field label="睡眠小时"><input value={form.sleep_hours} onChange={e => setForm({ ...form, sleep_hours: e.target.value })} placeholder="例如 7.5" /></Field>
-    <Toggle label="熬夜" checked={form.stayed_up_late} onChange={v => setForm({ ...form, stayed_up_late: v })} />
-    <Toggle label="完成体态训练" checked={form.posture_training} onChange={v => setForm({ ...form, posture_training: v })} />
-    <Field label="备注" className="field-wide"><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="今天身体状态、疼痛、疲劳、训练感受" /></Field>
-  </>} onSave={save} table={<DataTable title="身体记录" rows={rows} columns={['entry_date', 'weight', 'exercise_type', 'exercise_minutes', 'sleep_hours', 'stayed_up_late', 'posture_training', 'note']} endpoint="/api/body" onDeleted={load} />} />;
+  return <section className="stack">
+    <WeightTrend rows={rows} />
+    <RecordPage title="新增身体记录" button="保存记录" className="body-record-form" form={<>
+      <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
+      <Field label="体重"><input value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} inputMode="decimal" placeholder="例如 65.5" /></Field>
+      <Field label="运动类型"><input value={form.exercise_type} onChange={e => setForm({ ...form, exercise_type: e.target.value })} placeholder="力量 / 快走 / 拉伸" /></Field>
+      <Field label="运动分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
+      <Field label="睡眠小时"><input value={form.sleep_hours} onChange={e => setForm({ ...form, sleep_hours: e.target.value })} inputMode="decimal" placeholder="例如 7.5" /></Field>
+      <Toggle label="熬夜" checked={form.stayed_up_late} onChange={v => setForm({ ...form, stayed_up_late: v })} />
+      <Toggle label="完成体态训练" checked={form.posture_training} onChange={v => setForm({ ...form, posture_training: v })} />
+      <Field label="备注" className="field-wide"><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="今天身体状态、疼痛、疲劳、训练感受" /></Field>
+    </>} onSave={save} table={<DataTable title="身体记录" rows={rows} columns={['entry_date', 'weight', 'exercise_type', 'exercise_minutes', 'sleep_hours', 'stayed_up_late', 'posture_training', 'note']} endpoint="/api/body" onDeleted={load} />} />
+  </section>;
+}
+
+function WeightTrend({ rows }: { rows: BodyLog[] }) {
+  const values = rows.filter(row => row.weight !== null && row.weight !== undefined).sort((a, b) => a.entry_date.localeCompare(b.entry_date) || a.id - b.id).slice(-14);
+  if (!values.length) return <div className="panel weight-panel"><div className="panel-head"><h3>体重趋势</h3><span>等待记录</span></div><p className="empty-chart">添加体重记录后，这里会展示变化趋势。</p></div>;
+  const weights = values.map(row => Number(row.weight));
+  const min = Math.min(...weights);
+  const max = Math.max(...weights);
+  const range = Math.max(max - min, 1);
+  const points = values.map((row, index) => {
+    const x = values.length === 1 ? 360 : 46 + index * (628 / (values.length - 1));
+    const y = 194 - ((Number(row.weight) - min) / range) * 132;
+    return { ...row, x, y };
+  });
+  return <div className="panel weight-panel">
+    <div className="panel-head"><h3>体重趋势</h3><span>最近 {values.length} 条</span></div>
+    <div className="weight-chart-wrap">
+      <svg className="weight-chart" viewBox="0 0 720 240" role="img" aria-label="体重变化折线图">
+        {[62, 106, 150, 194].map(y => <line key={y} x1="46" x2="674" y1={y} y2={y} />)}
+        <polyline points={points.map(point => `${point.x},${point.y}`).join(' ')} />
+        {points.map(point => <circle key={`${point.id}-${point.entry_date}`} cx={point.x} cy={point.y} r="5"><title>{point.entry_date}: {Number(point.weight).toFixed(2)} kg</title></circle>)}
+        <text x="46" y="224">{values[0].entry_date}</text>
+        <text x="674" y="224" textAnchor="end">{values[values.length - 1].entry_date}</text>
+        <text x="46" y="48">{max.toFixed(2)} kg</text>
+        <text x="674" y="48" textAnchor="end">最新 {weights[weights.length - 1].toFixed(2)} kg</text>
+      </svg>
+    </div>
+  </div>;
 }
 
 function Career({ onSaved }: { onSaved: () => void }) {
@@ -1434,13 +1496,18 @@ function DataTable({ title, rows, columns, endpoint, onDeleted }: { title: strin
         <thead><tr>{columns.map(col => <th key={col}>{columnLabels[col] || col}</th>)}<th></th></tr></thead>
         <tbody>
           {rows.map(row => <tr key={row.id}>
-            {columns.map(col => <td key={col} data-label={columnLabels[col] || col}>{String(row[col] ?? '')}</td>)}
+            {columns.map(col => <td key={col} data-label={columnLabels[col] || col}>{formatCell(col, row[col])}</td>)}
             <td className="table-actions"><button className="icon danger" onClick={() => remove(row.id)} title="删除"><Trash2 size={15} /></button></td>
           </tr>)}
         </tbody>
       </table>
     </div>
   </div>;
+}
+
+function formatCell(column: string, value: unknown) {
+  if (column === 'amount' && value !== null && value !== undefined && value !== '') return Number(value).toFixed(2);
+  return String(value ?? '');
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

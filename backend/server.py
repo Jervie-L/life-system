@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Iterator
 from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,12 +16,17 @@ HOST = "127.0.0.1"
 PORT = 8765
 
 
-def connect() -> sqlite3.Connection:
+@contextmanager
+def connect() -> Iterator[sqlite3.Connection]:
     DATA_DIR.mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init_db() -> None:
@@ -236,6 +243,10 @@ def body(handler: BaseHTTPRequestHandler) -> dict:
 
 def bool_int(value: object) -> int:
     return 1 if value in (True, 1, "1", "true", "on", "yes") else 0
+
+
+def currency(value: object) -> float:
+    return float(f"{float(value or 0):.2f}")
 
 
 def settings_dict() -> dict:
@@ -653,7 +664,7 @@ def insert_finance(data: dict) -> dict:
             (
                 data.get("entry_date") or date.today().isoformat(),
                 data.get("type", "支出"),
-                float(data.get("amount") or 0),
+                currency(data.get("amount")),
                 account_id,
                 data.get("category", ""),
                 data.get("note", ""),
@@ -673,9 +684,9 @@ def finance_accounts() -> list[dict]:
     return rows("""
         SELECT
           finance_accounts.*,
-          opening_balance + COALESCE(SUM(
+          ROUND(opening_balance + COALESCE(SUM(
             CASE WHEN finance_entries.type = '支出' THEN -finance_entries.amount ELSE finance_entries.amount END
-          ), 0) AS balance
+          ), 0), 2) AS balance
         FROM finance_accounts
         LEFT JOIN finance_entries ON finance_entries.account_id = finance_accounts.id
         GROUP BY finance_accounts.id
@@ -696,7 +707,7 @@ def insert_finance_account(data: dict) -> dict:
     with connect() as db:
         cur = db.execute(
             "INSERT INTO finance_accounts (name, account_type, opening_balance, created_at) VALUES (?, ?, ?, ?)",
-            (name, data.get("account_type", "银行账户"), float(data.get("opening_balance") or 0), timestamp),
+            (name, data.get("account_type", "银行账户"), currency(data.get("opening_balance")), timestamp),
         )
         row = db.execute("SELECT *, opening_balance AS balance FROM finance_accounts WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
@@ -706,7 +717,7 @@ def update_finance_account(account_id: int, data: dict) -> dict:
     name = str(data.get("name") or "").strip()
     if not name:
         raise ValueError("账户名称不能为空")
-    balance = float(data.get("balance") or 0)
+    balance = currency(data.get("balance"))
     with connect() as db:
         account = db.execute("SELECT * FROM finance_accounts WHERE id = ?", (account_id,)).fetchone()
         if not account:
@@ -721,7 +732,7 @@ def update_finance_account(account_id: int, data: dict) -> dict:
         ).fetchone()["total"]
         db.execute(
             "UPDATE finance_accounts SET name = ?, account_type = ?, opening_balance = ? WHERE id = ?",
-            (name, data.get("account_type", "银行账户"), balance - float(delta), account_id),
+            (name, data.get("account_type", "银行账户"), currency(balance - float(delta)), account_id),
         )
     return next(row for row in finance_accounts() if row["id"] == account_id)
 

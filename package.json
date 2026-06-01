@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --configLoader runner --host 127.0.0.1 --port 5173",
+    "test:backend": "python -m unittest discover -s tests -v",
     "build": "tsc && vite build --configLoader runner",
     "build:pwa": "tsc && vite build --configLoader runner --mode pwa",
     "build:ios": "npm run build -- --mode ios && cap sync ios",

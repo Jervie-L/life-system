@@ -240,8 +240,8 @@ function post(store: Store, path: string, data: Record<string, unknown>): unknow
   }
   const handlers: Record<string, () => Row> = {
     '/api/urge-logs': () => insert(store, 'urge_logs', { ...data, logged_at: text(data.logged_at, timestamp()), urge_score: number(data.urge_score) }),
-    '/api/finance-accounts': () => insert(store, 'finance_accounts', { name: required(data.name, '账户名称不能为空'), account_type: text(data.account_type, '银行账户'), opening_balance: number(data.opening_balance) }),
-    '/api/finance': () => insert(store, 'finance_entries', { ...data, entry_date: text(data.entry_date, today()), type: text(data.type, '支出'), amount: number(data.amount), account_id: requiredAccountId(store, data.account_id) }),
+    '/api/finance-accounts': () => insert(store, 'finance_accounts', { name: required(data.name, '账户名称不能为空'), account_type: text(data.account_type, '银行账户'), opening_balance: currency(data.opening_balance) }),
+    '/api/finance': () => insert(store, 'finance_entries', { ...data, entry_date: text(data.entry_date, today()), type: text(data.type, '支出'), amount: currency(data.amount), account_id: requiredAccountId(store, data.account_id) }),
     '/api/body': () => insert(store, 'body_logs', { ...data, entry_date: text(data.entry_date, today()), weight: optionalNumber(data.weight), sleep_hours: optionalNumber(data.sleep_hours), exercise_minutes: number(data.exercise_minutes), stayed_up_late: boolInt(data.stayed_up_late), posture_training: boolInt(data.posture_training) }),
     '/api/career': () => insert(store, 'career_logs', { ...data, entry_date: text(data.entry_date, today()), learning_minutes: number(data.learning_minutes) }),
     '/api/reviews': () => insert(store, 'reviews', { ...data, review_type: text(data.review_type, '周复盘'), period_start: text(data.period_start, today()), period_end: text(data.period_end, today()) }),
@@ -274,6 +274,10 @@ function accountTypeOrder(value: string): number {
   return index === -1 ? 99 : index;
 }
 
+function currency(value: unknown): number {
+  return Math.round((number(value) + Number.EPSILON) * 100) / 100;
+}
+
 function put(store: Store, path: string, data: Record<string, unknown>): unknown {
   if (path === '/api/settings') {
     Object.entries(data).forEach(([key, value]) => store.settings[key] = text(value));
@@ -289,9 +293,9 @@ function put(store: Store, path: string, data: Record<string, unknown>): unknown
     Object.assign(account, {
       name: required(data.name, '账户名称不能为空'),
       account_type: text(data.account_type, '银行账户'),
-      opening_balance: number(data.balance) - delta,
+      opening_balance: currency(currency(data.balance) - delta),
     });
-    return { ...account, balance: number(data.balance) };
+    return { ...account, balance: currency(data.balance) };
   }
   const match = path.match(/^\/api\/(checklist|todos|notes)\/(\d+)$/);
   if (!match) throw new Error('接口不存在');
