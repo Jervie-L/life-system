@@ -155,7 +155,7 @@ def init_db() -> None:
 def seed_settings(db: sqlite3.Connection) -> None:
     defaults = {
         "target_savings": "400000",
-        "initial_savings": "250000",
+        "initial_savings": "0",
         "target_date": "2029-12-14",
         "privacy_mode": "1",
         "daily_exercise_target": "20",
@@ -539,6 +539,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/notes/"):
                 item_id = int(path.rsplit("/", 1)[1])
                 self.send_json(update_note(item_id, data))
+            elif path.startswith("/api/finance-accounts/"):
+                item_id = int(path.rsplit("/", 1)[1])
+                self.send_json(update_finance_account(item_id, data))
             else:
                 self.send_json({"error": "Not found"}, 404)
         except Exception as exc:
@@ -697,6 +700,30 @@ def insert_finance_account(data: dict) -> dict:
         )
         row = db.execute("SELECT *, opening_balance AS balance FROM finance_accounts WHERE id = ?", (cur.lastrowid,)).fetchone()
         return dict(row)
+
+
+def update_finance_account(account_id: int, data: dict) -> dict:
+    name = str(data.get("name") or "").strip()
+    if not name:
+        raise ValueError("账户名称不能为空")
+    balance = float(data.get("balance") or 0)
+    with connect() as db:
+        account = db.execute("SELECT * FROM finance_accounts WHERE id = ?", (account_id,)).fetchone()
+        if not account:
+            raise ValueError("账户不存在")
+        delta = db.execute(
+            """
+            SELECT COALESCE(SUM(CASE WHEN type = '支出' THEN -amount ELSE amount END), 0) AS total
+            FROM finance_entries
+            WHERE account_id = ?
+            """,
+            (account_id,),
+        ).fetchone()["total"]
+        db.execute(
+            "UPDATE finance_accounts SET name = ?, account_type = ?, opening_balance = ? WHERE id = ?",
+            (name, data.get("account_type", "银行账户"), balance - float(delta), account_id),
+        )
+    return next(row for row in finance_accounts() if row["id"] == account_id)
 
 
 def insert_body(data: dict) -> dict:

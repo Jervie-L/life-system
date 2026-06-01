@@ -49,7 +49,7 @@ function initialStore(): Store {
     version: 2 as const,
     settings: {
       target_savings: '400000',
-      initial_savings: '250000',
+      initial_savings: '0',
       target_date: '2029-12-14',
       privacy_mode: '1',
       daily_exercise_target: '20',
@@ -64,7 +64,7 @@ function initialStore(): Store {
     career_logs: [], reviews: [], checklist_items: [], todo_items: [], notes: [],
   } satisfies Store;
   checklistDefaults.forEach(([system, title]) => insert(store, 'checklist_items', { system, title, is_done: 0, completed_at: null }));
-  insert(store, 'finance_accounts', { name: '主要银行账户', account_type: '银行账户', opening_balance: 250000 });
+  insert(store, 'finance_accounts', { name: '主要银行账户', account_type: '银行账户', opening_balance: 0 });
   return store;
 }
 
@@ -278,6 +278,20 @@ function put(store: Store, path: string, data: Record<string, unknown>): unknown
   if (path === '/api/settings') {
     Object.entries(data).forEach(([key, value]) => store.settings[key] = text(value));
     return store.settings;
+  }
+  const accountMatch = path.match(/^\/api\/finance-accounts\/(\d+)$/);
+  if (accountMatch) {
+    const account = store.finance_accounts.find((row) => row.id === Number(accountMatch[1]));
+    if (!account) throw new Error('账户不存在');
+    const delta = store.finance_entries
+      .filter((row) => number(row.account_id) === account.id)
+      .reduce((sum, row) => sum + financeDelta(row), 0);
+    Object.assign(account, {
+      name: required(data.name, '账户名称不能为空'),
+      account_type: text(data.account_type, '银行账户'),
+      opening_balance: number(data.balance) - delta,
+    });
+    return { ...account, balance: number(data.balance) };
   }
   const match = path.match(/^\/api\/(checklist|todos|notes)\/(\d+)$/);
   if (!match) throw new Error('接口不存在');

@@ -1,4 +1,4 @@
-const CACHE = 'life-system-pwa-v9';
+const CACHE = 'life-system-pwa-v10';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.add('./')));

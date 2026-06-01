@@ -17,6 +17,7 @@ import {
   Menu,
   PiggyBank,
   Plus,
+  Pencil,
   RefreshCw,
   Save,
   Settings,
@@ -908,7 +909,8 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const [rows, setRows] = useState<FinanceEntry[]>([]);
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: '', note: '' });
-  const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], opening_balance: 0 });
+  const [editingAccountId, setEditingAccountId] = useState(0);
+  const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], balance: 0 });
   const load = async () => {
     const [nextRows, nextAccounts] = await Promise.all([
       api.get<FinanceEntry[]>('/api/finance'),
@@ -925,9 +927,24 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
     await load(); onSaved();
   };
   const saveAccount = async () => {
-    await api.send('/api/finance-accounts', 'POST', accountForm);
-    setAccountForm({ ...accountForm, name: '', opening_balance: 0 });
+    if (editingAccountId) {
+      await api.send(`/api/finance-accounts/${editingAccountId}`, 'PUT', accountForm);
+      notify('资金账户已更新。');
+    } else {
+      await api.send('/api/finance-accounts', 'POST', { ...accountForm, opening_balance: accountForm.balance });
+      notify('资金账户已添加。');
+    }
+    setEditingAccountId(0);
+    setAccountForm({ ...accountForm, name: '', balance: 0 });
     await load(); onSaved();
+  };
+  const editAccount = (account: FinanceAccount) => {
+    setEditingAccountId(account.id);
+    setAccountForm({ name: account.name, account_type: account.account_type, balance: account.balance });
+  };
+  const cancelEditAccount = () => {
+    setEditingAccountId(0);
+    setAccountForm({ name: '', account_type: '银行账户', balance: 0 });
   };
   const removeAccount = async (id: number) => {
     try {
@@ -957,15 +974,17 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
             <span className={`finance-dot finance-dot-${account.account_type}`} />
             <div><strong>{account.name}</strong><small>{account.account_type}</small></div>
             <b>{money(account.balance)}</b>
+            <button className="icon" onClick={() => editAccount(account)} title="编辑账户"><Pencil size={15} /></button>
             <button className="icon danger" onClick={() => removeAccount(account.id)} title="删除账户"><Trash2 size={15} /></button>
           </div>)}
         </div>
       </div>
     </div>
-    <RecordPage title="新增资金账户" button="添加账户" form={<>
+    <RecordPage title={editingAccountId ? '修改资金账户' : '新增资金账户'} button={editingAccountId ? '保存修改' : '添加账户'} form={<>
       <Field label="账户名称"><input value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="例如：招商银行工资卡" /></Field>
       <Field label="账户类型"><select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value as FinanceAccount['account_type'] })}><option>银行账户</option><option>现金</option><option>保险</option></select></Field>
-      <Field label="期初余额"><NumberInput value={accountForm.opening_balance} onChange={opening_balance => setAccountForm({ ...accountForm, opening_balance })} /></Field>
+      <Field label={editingAccountId ? '当前余额' : '初始余额'}><NumberInput value={accountForm.balance} onChange={balance => setAccountForm({ ...accountForm, balance })} /></Field>
+      {editingAccountId && <button className="ghost" onClick={cancelEditAccount}>取消修改</button>}
     </>} onSave={saveAccount} table={null} />
     <RecordPage title="新增财务记录" button="保存记录" form={<>
       <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
