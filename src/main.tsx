@@ -391,7 +391,7 @@ function Dashboard({ summary, onSaved, notify }: { summary: Summary; onSaved: ()
     <section className="stack">
       <EditableHero summary={summary} onSaved={onSaved} notify={notify} />
 
-      <div className="grid four">
+      <div className="grid four metric-grid">
         <Metric icon={<ShieldCheck />} label="30天自控记录" value={`${summary.self_control.days_logged}/30天`} hint={`中断 ${summary.self_control.breaches} 天`} />
         <Metric icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} />
         <Metric icon={<Dumbbell />} label="近7天运动" value={`${summary.body.exercise_minutes || 0}分钟`} hint={`熬夜 ${summary.body.late_days || 0} 天`} />
@@ -851,7 +851,7 @@ function SelfControl({ summary, onSaved }: { summary: Summary; onSaved: () => vo
 
   return (
     <section className="stack">
-      <div className="grid four">
+      <div className="grid four metric-grid">
         <Metric icon={<ShieldCheck />} label="30天打卡" value={`${summary.self_control.days_logged}/30天`} hint={`稳定 ${summary.self_control.clean_days} 天`} />
         <Metric icon={<Activity />} label="冲动记录" value={`${logs.length}条`} hint="来自下方冲动记录" />
         <Metric icon={<ClipboardCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="用于识别高危场景" />
@@ -979,7 +979,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
     }}>
       <div className="finance-pager-track">
         <div className={`finance-pane ${activePane === 0 ? 'active' : ''}`}>
-          <div className="grid four finance-metrics">
+          <div className="grid four metric-grid">
             <Metric icon={<PiggyBank />} label="目前存款" value={money(totals.total)} hint={`${accounts.length} 个资金账户`} />
             <Metric icon={<PiggyBank />} label="银行账户" value={money(totals['银行账户'])} hint="银行卡及储蓄账户" />
             <Metric icon={<PiggyBank />} label="现金" value={money(totals['现金'])} hint="随身及备用现金" />

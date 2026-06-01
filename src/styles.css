@@ -2261,20 +2261,20 @@ code {
     scroll-snap-align: start;
   }
 
-  .grid.four.finance-metrics {
+  .grid.four.metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
   }
 
-  .finance-metrics .metric {
+  .metric-grid .metric {
     padding: 12px;
   }
 
-  .finance-metrics .metric strong {
+  .metric-grid .metric strong {
     font-size: 18px;
   }
 
-  .finance-metrics .metric small {
+  .metric-grid .metric small {
     display: none;
   }
 
