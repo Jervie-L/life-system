@@ -42,7 +42,7 @@ export const accountKey = async (username: string) => `account:${await sha256Hex
 
 export const hashPassword = async (password: string, salt: string) => {
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: base64ToBytes(salt), iterations: 120_000, hash: 'SHA-256' }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: base64ToBytes(salt), iterations: 100_000, hash: 'SHA-256' }, key, 256);
   return bytesToHex(new Uint8Array(bits));
 };
 
