@@ -1,7 +1,7 @@
 node_modules/
 dist/
 .playwright-cli/
-backend/__pycache__/
+__pycache__/
 *.log
 .env*
 !.env.ios.example
