@@ -52,6 +52,29 @@ class FinancePrecisionTests(LifeSystemTestCase):
         self.assertEqual(server.finance_accounts()[0]["balance"], 8888.80)
         self.assertEqual(len(server.rows("SELECT * FROM finance_entries")), 3)
 
+    def test_finance_categories_and_decimal_amounts_are_preserved(self) -> None:
+        account_id = server.finance_accounts()[0]["id"]
+
+        expense = server.insert_finance({
+            "entry_date": "2026-06-02",
+            "type": "支出",
+            "amount": "35.68",
+            "account_id": account_id,
+            "category": "食品餐饮",
+        })
+        income = server.insert_finance({
+            "entry_date": "2026-06-02",
+            "type": "收入",
+            "amount": "888.88",
+            "account_id": account_id,
+            "category": "工资",
+        })
+
+        self.assertEqual(expense["amount"], 35.68)
+        self.assertEqual(expense["category"], "食品餐饮")
+        self.assertEqual(income["amount"], 888.88)
+        self.assertEqual(income["category"], "工资")
+
 
 class BodyTrendTests(LifeSystemTestCase):
     def test_weight_records_can_be_sorted_as_a_trend_series(self) -> None:

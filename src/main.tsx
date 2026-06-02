@@ -799,9 +799,9 @@ function NumberInput({
       placeholder={placeholder ?? '0'}
       onChange={event => {
         const raw = event.target.value;
-        if (/^\d*\.?\d*$/.test(raw)) {
+        if (/^\d*\.?\d{0,2}$/.test(raw)) {
           setText(raw);
-          if (raw !== '') commit(raw);
+          if (raw !== '' && raw !== '.') onChange(Number(raw));
         }
       }}
       onFocus={() => {
@@ -979,13 +979,13 @@ function weeklyUrgeCount(logs: Array<{ logged_at?: string }>) {
 function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: string) => void }) {
   const [rows, setRows] = useState<FinanceEntry[]>([]);
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
-  const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: '', note: '' });
+  const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: financeCategories['支出'][0], note: '' });
   const [editingAccountId, setEditingAccountId] = useState(0);
   const [accountFormOpen, setAccountFormOpen] = useState(false);
   const [activePane, setActivePane] = useState(0);
   const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], balance: 0 });
   const pagerRef = useRef<HTMLDivElement>(null);
-  const panes = ['存款概览', '新增流水', '财务记录'];
+  const panes = ['存款概览', '新增流水', '财务记录', '收支统计'];
   const load = async () => {
     const [nextRows, nextAccounts] = await Promise.all([
       api.get<FinanceEntry[]>('/api/finance'),
@@ -998,7 +998,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   useEffect(() => { load(); }, []);
   const save = async () => {
     await api.send('/api/finance', 'POST', form);
-    setForm({ ...form, amount: 0, category: '', note: '' });
+    setForm({ ...form, amount: 0, category: financeCategories[form.type as keyof typeof financeCategories][0], note: '' });
     await load(); onSaved(); notify('财务记录已保存。');
   };
   const saveAccount = async () => {
@@ -1084,20 +1084,32 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
         <div className={`finance-pane ${activePane === 1 ? 'active' : ''}`}>
           <RecordPage title="新增财务记录" button="保存记录" form={<>
             <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-            <Field label="类型"><select value={form.type} onChange={e => setForm({ ...form, type: e.target.value })}><option>支出</option><option>收入</option><option>存款</option></select></Field>
+            <Field label="类型"><select value={form.type} onChange={e => {
+              const type = e.target.value as keyof typeof financeCategories;
+              setForm({ ...form, type, category: financeCategories[type][0] });
+            }}><option>支出</option><option>收入</option><option>存款</option></select></Field>
             <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
             <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
-            <Field label="分类"><input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} /></Field>
+            <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategories[form.type as keyof typeof financeCategories].map(category => <option key={category}>{category}</option>)}</select></Field>
             <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
           </>} onSave={save} table={null} />
         </div>
         <div className={`finance-pane ${activePane === 2 ? 'active' : ''}`}>
           <DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onDeleted={async () => { await load(); onSaved(); }} />
         </div>
+        <div className={`finance-pane ${activePane === 3 ? 'active' : ''}`}>
+          <ExpenseStatistics rows={rows} />
+        </div>
       </div>
     </div>
   </section>;
 }
+
+const financeCategories = {
+  '支出': ['食品餐饮', '交通出行', '住房', '生活缴费', '医疗健康', '购物', '娱乐', '人情往来', '学习成长', '其他支出'],
+  '收入': ['工资', '奖金', '副业收入', '投资收益', '退款', '其他收入'],
+  '存款': ['储蓄转入', '定期存款', '基金', '保险', '其他存款'],
+};
 
 function financeTypeTotals(accounts: FinanceAccount[]) {
   const totals = { '银行账户': 0, '现金': 0, '保险': 0, total: 0 };
@@ -1121,6 +1133,61 @@ function FinancePie({ totals }: { totals: ReturnType<typeof financeTypeTotals> }
   return <div className="finance-pie-layout">
     <div className="finance-pie" style={{ background: chartTotal > 0 ? `conic-gradient(${stops.join(', ')})` : '#e8eeea' }}><span>{money(totals.total)}</span></div>
     <div className="finance-legend">{types.map(type => <div key={type}><i style={{ background: colors[type] }} /><span>{type}</span><strong>{money(totals[type])}</strong></div>)}</div>
+  </div>;
+}
+
+function ExpenseStatistics({ rows }: { rows: FinanceEntry[] }) {
+  const expenses = rows.filter(row => row.type === '支出');
+  const income = rows.filter(row => row.type === '收入').reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const spending = expenses.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const topExpenses = [...expenses].sort((a, b) => Number(b.amount) - Number(a.amount)).slice(0, 5);
+  const categoryTotals = expenseCategoryTotals(expenses);
+
+  return <div className="stack">
+    <div className="grid three finance-stat-metrics">
+      <Metric icon={<BarChart3 />} label="总收入" value={money(income)} hint="全部收入记录合计" />
+      <Metric icon={<BarChart3 />} label="总支出" value={money(spending)} hint="全部支出记录合计" />
+      <Metric icon={<PiggyBank />} label="收支结余" value={money(income - spending)} hint="收入减去支出" />
+    </div>
+    <div className="panel">
+      <div className="panel-head"><h3>金额前五的支出</h3><span>{topExpenses.length} 笔</span></div>
+      <div className="expense-ranking">
+        {topExpenses.map((row, index) => <div className="expense-ranking-row" key={row.id}>
+          <b>{index + 1}</b>
+          <div><strong>{row.category || '未分类'}</strong><small>{row.entry_date}{row.note ? ` · ${row.note}` : ''}</small></div>
+          <span>{money(row.amount)}</span>
+        </div>)}
+        {!topExpenses.length && <p className="empty-copy">暂无支出记录</p>}
+      </div>
+    </div>
+    <div className="panel">
+      <div className="panel-head"><h3>支出占比</h3><span>{money(spending)}</span></div>
+      <ExpensePie totals={categoryTotals} />
+    </div>
+  </div>;
+}
+
+function expenseCategoryTotals(rows: FinanceEntry[]) {
+  return rows.reduce<Record<string, number>>((totals, row) => {
+    const category = row.category || '未分类';
+    totals[category] = (totals[category] || 0) + Number(row.amount || 0);
+    return totals;
+  }, {});
+}
+
+function ExpensePie({ totals }: { totals: Record<string, number> }) {
+  const colors = ['#207456', '#d4a54f', '#7193b5', '#c47f65', '#7f79ad', '#6e9b86', '#c59cbd', '#a1a864', '#b7895f', '#78939a'];
+  const categories = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+  const total = categories.reduce((sum, [, amount]) => sum + Math.max(amount, 0), 0);
+  let cursor = 0;
+  const stops = categories.map(([, amount], index) => {
+    const start = cursor;
+    cursor += total > 0 ? Math.max(amount, 0) / total * 100 : 0;
+    return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+  });
+  return <div className="finance-pie-layout">
+    <div className="finance-pie" style={{ background: total > 0 ? `conic-gradient(${stops.join(', ')})` : '#e8eeea' }}><span>{money(total)}</span></div>
+    <div className="finance-legend">{categories.map(([category, amount], index) => <div key={category}><i style={{ background: colors[index % colors.length] }} /><span>{category}</span><strong>{money(amount)}</strong></div>)}</div>
   </div>;
 }
 
