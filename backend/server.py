@@ -553,6 +553,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/finance-accounts/"):
                 item_id = int(path.rsplit("/", 1)[1])
                 self.send_json(update_finance_account(item_id, data))
+            elif path.startswith("/api/finance/"):
+                item_id = int(path.rsplit("/", 1)[1])
+                self.send_json(update_finance(item_id, data))
             else:
                 self.send_json({"error": "Not found"}, 404)
         except Exception as exc:
@@ -677,6 +680,38 @@ def insert_finance(data: dict) -> dict:
             LEFT JOIN finance_accounts ON finance_accounts.id = finance_entries.account_id
             WHERE finance_entries.id = ?
         """, (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def update_finance(item_id: int, data: dict) -> dict:
+    account_id = int(data.get("account_id") or 0)
+    with connect() as db:
+        if not db.execute("SELECT id FROM finance_entries WHERE id = ?", (item_id,)).fetchone():
+            raise ValueError("财务记录不存在")
+        if not db.execute("SELECT id FROM finance_accounts WHERE id = ?", (account_id,)).fetchone():
+            raise ValueError("请选择有效的资金账户")
+        db.execute(
+            """
+            UPDATE finance_entries
+            SET entry_date = ?, type = ?, amount = ?, account_id = ?, category = ?, note = ?
+            WHERE id = ?
+            """,
+            (
+                data.get("entry_date") or date.today().isoformat(),
+                data.get("type", "支出"),
+                currency(data.get("amount")),
+                account_id,
+                data.get("category", ""),
+                data.get("note", ""),
+                item_id,
+            ),
+        )
+        row = db.execute("""
+            SELECT finance_entries.*, finance_accounts.name AS account_name
+            FROM finance_entries
+            LEFT JOIN finance_accounts ON finance_accounts.id = finance_entries.account_id
+            WHERE finance_entries.id = ?
+        """, (item_id,)).fetchone()
         return dict(row)
 
 

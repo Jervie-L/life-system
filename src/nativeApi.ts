@@ -297,6 +297,19 @@ function put(store: Store, path: string, data: Record<string, unknown>): unknown
     });
     return { ...account, balance: currency(data.balance) };
   }
+  const financeMatch = path.match(/^\/api\/finance\/(\d+)$/);
+  if (financeMatch) {
+    const row = store.finance_entries.find((item) => item.id === Number(financeMatch[1]));
+    if (!row) throw new Error('财务记录不存在');
+    Object.assign(row, {
+      ...data,
+      entry_date: text(data.entry_date, today()),
+      type: text(data.type, '支出'),
+      amount: currency(data.amount),
+      account_id: requiredAccountId(store, data.account_id),
+    });
+    return row;
+  }
   const match = path.match(/^\/api\/(checklist|todos|notes)\/(\d+)$/);
   if (!match) throw new Error('接口不存在');
   const table = ({ checklist: 'checklist_items', todos: 'todo_items', notes: 'notes' } as const)[match[1] as 'checklist' | 'todos' | 'notes'];

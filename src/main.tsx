@@ -980,6 +980,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const [rows, setRows] = useState<FinanceEntry[]>([]);
   const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
   const [form, setForm] = useState({ entry_date: today(), type: '支出', amount: 0, account_id: 0, category: financeCategories['支出'][0], note: '' });
+  const [editingEntryId, setEditingEntryId] = useState(0);
   const [editingAccountId, setEditingAccountId] = useState(0);
   const [accountFormOpen, setAccountFormOpen] = useState(false);
   const [activePane, setActivePane] = useState(0);
@@ -997,9 +998,19 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   };
   useEffect(() => { load(); }, []);
   const save = async () => {
-    await api.send('/api/finance', 'POST', form);
+    await api.send(editingEntryId ? `/api/finance/${editingEntryId}` : '/api/finance', editingEntryId ? 'PUT' : 'POST', form);
+    setEditingEntryId(0);
     setForm({ ...form, amount: 0, category: financeCategories[form.type as keyof typeof financeCategories][0], note: '' });
-    await load(); onSaved(); notify('财务记录已保存。');
+    await load(); onSaved(); notify(editingEntryId ? '财务记录已更新。' : '财务记录已保存。');
+  };
+  const editEntry = (entry: FinanceEntry) => {
+    setEditingEntryId(entry.id);
+    setForm({ entry_date: entry.entry_date, type: entry.type, amount: entry.amount, account_id: entry.account_id, category: entry.category, note: entry.note });
+    showPane(1);
+  };
+  const cancelEditEntry = () => {
+    setEditingEntryId(0);
+    setForm({ entry_date: today(), type: '支出', amount: 0, account_id: accounts[0]?.id || 0, category: financeCategories['支出'][0], note: '' });
   };
   const saveAccount = async () => {
     if (editingAccountId) {
@@ -1082,7 +1093,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
           </>} onSave={saveAccount} table={null} />}
         </div>
         <div className={`finance-pane ${activePane === 1 ? 'active' : ''}`}>
-          <RecordPage title="新增财务记录" button="保存记录" form={<>
+          <RecordPage title={editingEntryId ? '修改财务记录' : '新增财务记录'} button={editingEntryId ? '保存修改' : '保存记录'} form={<>
             <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
             <Field label="类型"><select value={form.type} onChange={e => {
               const type = e.target.value as keyof typeof financeCategories;
@@ -1090,12 +1101,13 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
             }}><option>支出</option><option>收入</option><option>存款</option></select></Field>
             <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
             <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
-            <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategories[form.type as keyof typeof financeCategories].map(category => <option key={category}>{category}</option>)}</select></Field>
+            <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategoryOptions(form.type, form.category).map(category => <option key={category}>{category}</option>)}</select></Field>
             <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
+            {editingEntryId > 0 && <button className="ghost" onClick={cancelEditEntry}>取消编辑</button>}
           </>} onSave={save} table={null} />
         </div>
         <div className={`finance-pane ${activePane === 2 ? 'active' : ''}`}>
-          <DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onDeleted={async () => { await load(); onSaved(); }} />
+          <DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onEdit={editEntry} onDeleted={async () => { await load(); onSaved(); }} />
         </div>
         <div className={`finance-pane ${activePane === 3 ? 'active' : ''}`}>
           <ExpenseStatistics rows={rows} />
@@ -1110,6 +1122,11 @@ const financeCategories = {
   '收入': ['工资', '奖金', '副业收入', '投资收益', '退款', '其他收入'],
   '存款': ['储蓄转入', '定期存款', '基金', '保险', '其他存款'],
 };
+
+function financeCategoryOptions(type: string, category = '') {
+  const options = financeCategories[type as keyof typeof financeCategories] || [];
+  return category && !options.includes(category) ? [category, ...options] : options;
+}
 
 function financeTypeTotals(accounts: FinanceAccount[]) {
   const totals = { '银行账户': 0, '现金': 0, '保险': 0, total: 0 };
@@ -1622,7 +1639,7 @@ function RecordPage({ title, button, form, onSave, table, className = '' }: { ti
   </section>;
 }
 
-function DataTable({ title, rows, columns, endpoint, onDeleted }: { title: string; rows: any[]; columns: string[]; endpoint: string; onDeleted: () => void }) {
+function DataTable({ title, rows, columns, endpoint, onDeleted, onEdit }: { title: string; rows: any[]; columns: string[]; endpoint: string; onDeleted: () => void; onEdit?: (row: any) => void }) {
   const remove = async (id: number) => {
     await api.send(`${endpoint}/${id}`, 'DELETE');
     onDeleted();
@@ -1635,7 +1652,10 @@ function DataTable({ title, rows, columns, endpoint, onDeleted }: { title: strin
         <tbody>
           {rows.map(row => <tr key={row.id}>
             {columns.map(col => <td key={col} data-label={columnLabels[col] || col}>{formatCell(col, row[col])}</td>)}
-            <td className="table-actions"><button className="icon danger" onClick={() => remove(row.id)} title="删除"><Trash2 size={15} /></button></td>
+            <td className="table-actions">
+              {onEdit && <button className="icon" onClick={() => onEdit(row)} title="编辑"><Pencil size={15} /></button>}
+              <button className="icon danger" onClick={() => remove(row.id)} title="删除"><Trash2 size={15} /></button>
+            </td>
           </tr>)}
         </tbody>
       </table>

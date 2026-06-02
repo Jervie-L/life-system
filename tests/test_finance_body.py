@@ -75,6 +75,32 @@ class FinancePrecisionTests(LifeSystemTestCase):
         self.assertEqual(income["amount"], 888.88)
         self.assertEqual(income["category"], "工资")
 
+    def test_finance_entry_can_be_edited_without_losing_precision(self) -> None:
+        account_id = server.finance_accounts()[0]["id"]
+        entry = server.insert_finance({
+            "entry_date": "2026-06-02",
+            "type": "支出",
+            "amount": "35.68",
+            "account_id": account_id,
+            "category": "食品餐饮",
+        })
+
+        updated = server.update_finance(entry["id"], {
+            "entry_date": "2026-06-03",
+            "type": "收入",
+            "amount": "88.88",
+            "account_id": account_id,
+            "category": "工资",
+            "note": "补发",
+        })
+
+        self.assertEqual(updated["entry_date"], "2026-06-03")
+        self.assertEqual(updated["type"], "收入")
+        self.assertEqual(updated["amount"], 88.88)
+        self.assertEqual(updated["category"], "工资")
+        self.assertEqual(updated["note"], "补发")
+        self.assertEqual(server.finance_accounts()[0]["balance"], 88.88)
+
 
 class BodyTrendTests(LifeSystemTestCase):
     def test_weight_records_can_be_sorted_as_a_trend_series(self) -> None:
