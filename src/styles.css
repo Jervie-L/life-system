@@ -770,6 +770,24 @@ button.ghost,
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.decimal-input {
+  display: flex;
+  gap: 6px;
+}
+
+.decimal-input input {
+  min-width: 0;
+}
+
+button.decimal-key {
+  flex: 0 0 42px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
 input[type="date"],
 input[type="datetime-local"] {
   display: block;

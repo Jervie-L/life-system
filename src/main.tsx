@@ -724,7 +724,7 @@ function TodayForm({ summary, onSaved, notify }: { summary: Summary; onSaved: ()
         <Field label="最大冲动 1-10"><NumberInput min={0} max={10} value={form.urge_score} onChange={value => setForm({ ...form, urge_score: value })} /></Field>
         <Field label="触发点"><input value={form.trigger} onChange={e => setForm({ ...form, trigger: e.target.value })} placeholder="深夜 / 压力 / 无聊 / 游戏后" /></Field>
         <Field label="替代行为"><input value={form.replacement} onChange={e => setForm({ ...form, replacement: e.target.value })} placeholder="运动 / 学习 / 整理" /></Field>
-        <Field label="今日支出"><NumberInput value={form.expense_amount} onChange={value => setForm({ ...form, expense_amount: value })} /></Field>
+        <Field label="今日支出"><NumberInput precision={2} value={form.expense_amount} onChange={value => setForm({ ...form, expense_amount: value })} /></Field>
         <Field label="运动/拉伸分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
         <Field label="事业学习分钟"><NumberInput value={form.career_minutes} onChange={value => setForm({ ...form, career_minutes: value })} /></Field>
         <Field label="今天做对的一件事" className="field-long"><textarea value={form.did_right} onChange={e => setForm({ ...form, did_right: e.target.value })} /></Field>
@@ -766,14 +766,17 @@ function NumberInput({
   min,
   max,
   placeholder,
+  precision = 0,
 }: {
   value: number | string;
   onChange: (value: number) => void;
   min?: number;
   max?: number;
   placeholder?: string;
+  precision?: number;
 }) {
   const [text, setText] = useState(value === 0 ? '' : String(value ?? ''));
+  const pattern = precision > 0 ? new RegExp(`^\\d*\\.?\\d{0,${precision}}$`) : /^\d*$/;
 
   useEffect(() => {
     setText(value === 0 ? '' : String(value ?? ''));
@@ -792,14 +795,20 @@ function NumberInput({
     setText(next === 0 ? '' : String(next));
   };
 
-  return (
+  const appendDecimalPoint = () => {
+    if (precision === 0 || text.includes('.')) return;
+    setText(`${text || '0'}.`);
+  };
+
+  const input = (
     <input
-      inputMode="decimal"
+      type="text"
+      inputMode={precision > 0 ? 'decimal' : 'numeric'}
       value={text}
       placeholder={placeholder ?? '0'}
       onChange={event => {
-        const raw = event.target.value;
-        if (/^\d*\.?\d{0,2}$/.test(raw)) {
+        const raw = event.target.value.replace(',', '.');
+        if (pattern.test(raw)) {
           setText(raw);
           if (raw !== '' && raw !== '.') onChange(Number(raw));
         }
@@ -810,6 +819,9 @@ function NumberInput({
       onBlur={() => commit(text)}
     />
   );
+  return precision > 0
+    ? <div className="decimal-input">{input}<button type="button" className="decimal-key" onClick={appendDecimalPoint} aria-label="输入小数点">.</button></div>
+    : input;
 }
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
@@ -1088,7 +1100,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
           {accountFormOpen && <RecordPage title={editingAccountId ? '修改资金账户' : '新增资金账户'} button={editingAccountId ? '保存修改' : '添加账户'} form={<>
             <Field label="账户名称"><input value={accountForm.name} onChange={e => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="例如：招商银行工资卡" /></Field>
             <Field label="账户类型"><select value={accountForm.account_type} onChange={e => setAccountForm({ ...accountForm, account_type: e.target.value as FinanceAccount['account_type'] })}><option>银行账户</option><option>现金</option><option>保险</option></select></Field>
-            <Field label={editingAccountId ? '当前余额' : '初始余额'}><NumberInput value={accountForm.balance} onChange={balance => setAccountForm({ ...accountForm, balance })} /></Field>
+            <Field label={editingAccountId ? '当前余额' : '初始余额'}><NumberInput precision={2} value={accountForm.balance} onChange={balance => setAccountForm({ ...accountForm, balance })} /></Field>
             <button className="ghost" onClick={cancelEditAccount}>取消</button>
           </>} onSave={saveAccount} table={null} />}
         </div>
@@ -1100,7 +1112,7 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
               setForm({ ...form, type, category: financeCategories[type][0] });
             }}><option>支出</option><option>收入</option><option>存款</option></select></Field>
             <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
-            <Field label="金额"><NumberInput value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
+            <Field label="金额"><NumberInput precision={2} value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
             <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategoryOptions(form.type, form.category).map(category => <option key={category}>{category}</option>)}</select></Field>
             <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
             {editingEntryId > 0 && <button className="ghost" onClick={cancelEditEntry}>取消编辑</button>}
