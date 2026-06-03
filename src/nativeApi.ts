@@ -39,7 +39,7 @@ const checklistDefaults = [
 const timestamp = () => new Date().toISOString().slice(0, 19);
 const today = () => new Date().toLocaleDateString('en-CA');
 const text = (value: unknown, fallback = '') => String(value ?? fallback);
-const number = (value: unknown) => Number(value) || 0;
+const number = (value: unknown) => Number(String(value ?? '').trim().replace(',', '.')) || 0;
 const optionalNumber = (value: unknown) => value === '' || value == null ? null : number(value);
 const boolInt = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true' || value === 'on' ? 1 : 0;
 

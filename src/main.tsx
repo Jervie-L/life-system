@@ -776,10 +776,12 @@ function NumberInput({
   precision?: number;
 }) {
   const [text, setText] = useState(value === 0 ? '' : String(value ?? ''));
+  const inputRef = useRef<HTMLInputElement>(null);
+  const focusedRef = useRef(false);
   const pattern = precision > 0 ? new RegExp(`^\\d*\\.?\\d{0,${precision}}$`) : /^\d*$/;
 
   useEffect(() => {
-    setText(value === 0 ? '' : String(value ?? ''));
+    if (!focusedRef.current) setText(value === 0 ? '' : String(value ?? ''));
   }, [value]);
 
   const commit = (raw: string) => {
@@ -798,10 +800,12 @@ function NumberInput({
   const appendDecimalPoint = () => {
     if (precision === 0 || text.includes('.')) return;
     setText(`${text || '0'}.`);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const input = (
     <input
+      ref={inputRef}
       type="text"
       inputMode={precision > 0 ? 'decimal' : 'numeric'}
       value={text}
@@ -814,9 +818,13 @@ function NumberInput({
         }
       }}
       onFocus={() => {
+        focusedRef.current = true;
         if (text === '0') setText('');
       }}
-      onBlur={() => commit(text)}
+      onBlur={() => {
+        focusedRef.current = false;
+        commit(text);
+      }}
     />
   );
   return precision > 0
@@ -1222,7 +1230,16 @@ function ExpensePie({ totals }: { totals: Record<string, number> }) {
 
 function Body({ onSaved }: { onSaved: () => void }) {
   const [rows, setRows] = useState<BodyLog[]>([]);
-  const [form, setForm] = useState({ entry_date: today(), weight: '', exercise_type: '', exercise_minutes: 0, sleep_hours: '', stayed_up_late: false, posture_training: false, note: '' });
+  const [form, setForm] = useState<{
+    entry_date: string;
+    weight: number | string;
+    exercise_type: string;
+    exercise_minutes: number;
+    sleep_hours: number | string;
+    stayed_up_late: boolean;
+    posture_training: boolean;
+    note: string;
+  }>({ entry_date: today(), weight: '', exercise_type: '', exercise_minutes: 0, sleep_hours: '', stayed_up_late: false, posture_training: false, note: '' });
   const load = async () => setRows(await api.get('/api/body'));
   useEffect(() => { load(); }, []);
   const save = async () => {
@@ -1234,10 +1251,10 @@ function Body({ onSaved }: { onSaved: () => void }) {
     <WeightTrend rows={rows} />
     <RecordPage title="新增身体记录" button="保存记录" className="body-record-form" form={<>
       <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-      <Field label="体重"><input value={form.weight} onChange={e => setForm({ ...form, weight: e.target.value })} inputMode="decimal" placeholder="例如 65.5" /></Field>
+      <Field label="体重"><NumberInput precision={2} value={form.weight} onChange={weight => setForm({ ...form, weight })} placeholder="例如 65.50" /></Field>
       <Field label="运动类型"><input value={form.exercise_type} onChange={e => setForm({ ...form, exercise_type: e.target.value })} placeholder="力量 / 快走 / 拉伸" /></Field>
       <Field label="运动分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
-      <Field label="睡眠小时"><input value={form.sleep_hours} onChange={e => setForm({ ...form, sleep_hours: e.target.value })} inputMode="decimal" placeholder="例如 7.5" /></Field>
+      <Field label="睡眠小时"><NumberInput precision={2} value={form.sleep_hours} onChange={sleep_hours => setForm({ ...form, sleep_hours })} placeholder="例如 7.50" /></Field>
       <Toggle label="熬夜" checked={form.stayed_up_late} onChange={v => setForm({ ...form, stayed_up_late: v })} />
       <Toggle label="完成体态训练" checked={form.posture_training} onChange={v => setForm({ ...form, posture_training: v })} />
       <Field label="备注" className="field-wide"><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="今天身体状态、疼痛、疲劳、训练感受" /></Field>

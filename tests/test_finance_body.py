@@ -103,6 +103,16 @@ class FinancePrecisionTests(LifeSystemTestCase):
 
 
 class BodyTrendTests(LifeSystemTestCase):
+    def test_body_decimal_fields_are_preserved(self) -> None:
+        row = server.insert_body({
+            "entry_date": "2026-06-03",
+            "weight": "65.45",
+            "sleep_hours": "7.75",
+        })
+
+        self.assertEqual(row["weight"], 65.45)
+        self.assertEqual(row["sleep_hours"], 7.75)
+
     def test_weight_records_can_be_sorted_as_a_trend_series(self) -> None:
         server.insert_body({"entry_date": "2026-06-03", "weight": "65.45"})
         server.insert_body({"entry_date": "2026-06-01", "weight": "66.20"})
