@@ -1004,7 +1004,10 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const [editingAccountId, setEditingAccountId] = useState(0);
   const [accountFormOpen, setAccountFormOpen] = useState(false);
   const [activePane, setActivePane] = useState(0);
+  const activePaneRef = useRef(0);
+  const [financeFilterDate, setFinanceFilterDate] = useState(today());
   const [accountForm, setAccountForm] = useState({ name: '', account_type: '银行账户' as FinanceAccount['account_type'], balance: 0 });
+  const sectionRef = useRef<HTMLElement>(null);
   const pagerRef = useRef<HTMLDivElement>(null);
   const panes = ['存款概览', '新增流水', '财务记录', '收支统计'];
   const load = async () => {
@@ -1064,20 +1067,43 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
     }
   };
   const totals = financeTypeTotals(accounts);
+  const filteredRows = useMemo(
+    () => financeFilterDate ? rows.filter(row => row.entry_date === financeFilterDate) : rows,
+    [financeFilterDate, rows],
+  );
+  const filteredExpenseTotal = useMemo(
+    () => filteredRows.filter(row => row.type === '支出').reduce((sum, row) => sum + Number(row.amount || 0), 0),
+    [filteredRows],
+  );
+  const financeFilterSummary = financeFilterDate ? `${financeFilterDate} ${filteredRows.length} 条记录` : `全部 ${rows.length} 条记录`;
+  const scrollFinanceTop = () => {
+    if (!window.matchMedia('(max-width: 680px)').matches) return;
+    window.requestAnimationFrame(() => {
+      sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+    });
+  };
   const showPane = (index: number) => {
+    activePaneRef.current = index;
     setActivePane(index);
+    scrollFinanceTop();
     const pager = pagerRef.current;
     if (pager && window.matchMedia('(max-width: 680px)').matches) {
       pager.scrollTo({ left: pager.clientWidth * index, behavior: 'smooth' });
     }
   };
-  return <section className="finance-page">
+  return <section className="finance-page" ref={sectionRef}>
     <div className="finance-tabs" role="tablist" aria-label="存钱系统页面">
       {panes.map((pane, index) => <button className={activePane === index ? 'active' : ''} key={pane} onClick={() => showPane(index)}>{pane}</button>)}
     </div>
     <div className="finance-pager" ref={pagerRef} onScroll={event => {
       const width = event.currentTarget.clientWidth;
-      if (width) setActivePane(Math.round(event.currentTarget.scrollLeft / width));
+      if (!width) return;
+      const nextPane = Math.round(event.currentTarget.scrollLeft / width);
+      if (nextPane !== activePaneRef.current) {
+        activePaneRef.current = nextPane;
+        setActivePane(nextPane);
+        scrollFinanceTop();
+      }
     }}>
       <div className="finance-pager-track">
         <div className={`finance-pane ${activePane === 0 ? 'active' : ''}`}>
@@ -1127,7 +1153,16 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
           </>} onSave={save} table={null} />
         </div>
         <div className={`finance-pane ${activePane === 2 ? 'active' : ''}`}>
-          <DataTable title="财务记录" rows={rows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onEdit={editEntry} onDeleted={async () => { await load(); onSaved(); }} />
+          <div className="panel finance-filter-panel">
+            <div className="panel-head"><h3>日期筛选</h3><span>{financeFilterSummary}</span></div>
+            <div className="finance-filter-grid">
+              <Field label="筛选日期"><DateInput value={financeFilterDate} onChange={setFinanceFilterDate} /></Field>
+              <Metric icon={<PiggyBank />} label="当日支出" value={money(filteredExpenseTotal)} hint={financeFilterDate || '未选择日期'} />
+              <button className="ghost" onClick={() => setFinanceFilterDate('')}>查看全部</button>
+              <button className="ghost" onClick={() => setFinanceFilterDate(today())}>回到今天</button>
+            </div>
+          </div>
+          <DataTable title="财务记录" rows={filteredRows} columns={['entry_date', 'type', 'amount', 'account_name', 'category', 'note']} endpoint="/api/finance" onEdit={editEntry} onDeleted={async () => { await load(); onSaved(); }} />
         </div>
         <div className={`finance-pane ${activePane === 3 ? 'active' : ''}`}>
           <ExpenseStatistics rows={rows} />

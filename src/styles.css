@@ -2167,6 +2167,18 @@ th {
   gap: 18px;
 }
 
+.finance-filter-grid {
+  display: grid;
+  align-items: end;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) auto auto;
+  gap: 12px;
+}
+
+.finance-filter-grid .metric {
+  min-height: 0;
+  padding: 12px 14px;
+}
+
 .finance-pie-layout {
   display: flex;
   align-items: center;
@@ -2431,6 +2443,20 @@ code {
     flex: 1;
     padding-inline: 8px;
     font-size: 13px;
+  }
+
+  .finance-filter-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .finance-filter-grid label {
+    grid-column: 1 / -1;
+  }
+
+  .finance-filter-grid .metric {
+    grid-column: 1 / -1;
   }
 
   .finance-pager {
