@@ -321,6 +321,7 @@ function App() {
     ['reviews', '复盘', BarChart3],
     ['settings', '设置', Settings],
   ] as const;
+  const bottomNav = nav.filter(([id]) => ['dashboard', 'today', 'calendar', 'finance', 'settings'].includes(id));
 
   return (
     <div
@@ -386,6 +387,14 @@ function App() {
         {summary && page === 'reviews' && <Reviews onSaved={refresh} />}
         {summary && page === 'settings' && <SettingsPage summary={summary} onSaved={refresh} notify={notify} />}
       </main>
+      <nav className="mobile-tabbar" aria-label="底部主导航">
+        {bottomNav.map(([id, label, Icon]) => (
+          <button className={page === id ? 'active' : ''} key={id} onClick={() => setPage(id)}>
+            <Icon size={21} />
+            <span>{label.replace('总看板', '首页').replace('今日打卡', '待办').replace('存钱系统', '数据')}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -418,6 +427,29 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
           <span>{progress.toFixed(1)}%</span>
         </div>
         <div className="progress"><span style={{ width: `${progress}%` }} /></div>
+      </div>
+
+      <div className="life-pillars" aria-label="人生系统四个核心模块">
+        <button onClick={() => onNavigate('self-control')}>
+          <ClipboardCheck size={28} />
+          <span>自律打卡</span>
+          <small>养成好习惯</small>
+        </button>
+        <button onClick={() => onNavigate('finance')}>
+          <PiggyBank size={28} />
+          <span>财务自由</span>
+          <small>存钱更有目标</small>
+        </button>
+        <button onClick={() => onNavigate('body')}>
+          <Activity size={28} />
+          <span>健康生活</span>
+          <small>运动饮食管理</small>
+        </button>
+        <button onClick={() => onNavigate('career')}>
+          <BriefcaseBusiness size={28} />
+          <span>事业成长</span>
+          <small>学习与成长</small>
+        </button>
       </div>
     </section>
   );
