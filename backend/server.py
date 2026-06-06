@@ -253,6 +253,13 @@ def settings_dict() -> dict:
     return {row["key"]: row["value"] for row in rows("SELECT key, value FROM settings")}
 
 
+SELF_CONTROL_BREACH_WORDS = ("破戒", "色情", "擦边", "看片", "手淫")
+
+
+def is_self_control_breach_text(value: str) -> bool:
+    return any(word in value for word in SELF_CONTROL_BREACH_WORDS)
+
+
 def summary() -> dict:
     settings = settings_dict()
     today = date.today().isoformat()
@@ -290,18 +297,22 @@ def summary() -> dict:
         WHERE entry_date >= date('now', '-6 day')
         """
     )
-    self_control_total = one(
-        "SELECT COUNT(*) AS count FROM daily_checkins WHERE entry_date BETWEEN ? AND ?",
-        (start, end),
-    )["count"]
-    self_control_breaches = one(
+    self_control_total = max((date.fromisoformat(min(today, end)) - date.fromisoformat(start)).days + 1, 0)
+    self_control_total = min(self_control_total, 30)
+    urge_rows = rows(
         """
-        SELECT COUNT(*) AS count
-        FROM daily_checkins
-        WHERE entry_date BETWEEN ? AND ? AND self_control_breach = 1
+        SELECT logged_at, before_urge, feeling, delay_action, result
+        FROM urge_logs
+        WHERE substr(logged_at, 1, 10) BETWEEN ? AND ?
         """,
         (start, end),
-    )["count"]
+    )
+    self_control_breach_days = {
+        row["logged_at"][:10]
+        for row in urge_rows
+        if is_self_control_breach_text(" ".join(str(row.get(key) or "") for key in ("before_urge", "feeling", "delay_action", "result")))
+    }
+    self_control_breaches = len(self_control_breach_days)
     total_savings = float(initial) + float(finance["saved"]) + float(finance["income"]) - float(finance["spent"])
     return {
         "settings": settings,
@@ -373,7 +384,7 @@ def daily_aggregates(entry_date: str) -> dict:
         "exercise_minutes": body["exercise_minutes"],
         "career_minutes": career["career_minutes"],
         "urge_score": max_urge,
-        "self_control_breach": 1 if any(word in text for word in ("破戒", "色情", "擦边", "看片")) else 0,
+        "self_control_breach": 1 if is_self_control_breach_text(text) else 0,
         "masturbation": 1 if "手淫" in text else 0,
         "trigger": "冲动记录" if urges else "",
         "replacement": "身体/事业记录已同步" if body["exercise_minutes"] or career["career_minutes"] else "",

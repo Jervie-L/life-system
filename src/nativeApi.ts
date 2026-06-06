@@ -42,6 +42,8 @@ const text = (value: unknown, fallback = '') => String(value ?? fallback);
 const number = (value: unknown) => Number(String(value ?? '').trim().replace(',', '.')) || 0;
 const optionalNumber = (value: unknown) => value === '' || value == null ? null : number(value);
 const boolInt = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true' || value === 'on' ? 1 : 0;
+const selfControlBreachWords = ['破戒', '色情', '擦边', '看片', '手淫'];
+const isSelfControlBreachText = (value: string) => selfControlBreachWords.some((word) => value.includes(word));
 
 function initialStore(): Store {
   const counters = Object.fromEntries(tables.map((table) => [table, 0])) as Record<Table, number>;
@@ -135,7 +137,7 @@ function aggregates(store: Store, date: string) {
     exercise_minutes: body.reduce((sum, row) => sum + number(row.exercise_minutes), 0),
     career_minutes: career.reduce((sum, row) => sum + number(row.learning_minutes), 0),
     urge_score: Math.max(0, ...urges.map((row) => number(row.urge_score))),
-    self_control_breach: ['破戒', '色情', '擦边', '看片'].some((word) => urgeText.includes(word)) ? 1 : 0,
+    self_control_breach: isSelfControlBreachText(urgeText) ? 1 : 0,
     masturbation: urgeText.includes('手淫') ? 1 : 0,
     trigger: urges.length ? '冲动记录' : '',
     replacement: body.length || career.length ? '身体/事业记录已同步' : '',
@@ -147,7 +149,17 @@ function summary(store: Store) {
   const settings = store.settings;
   const start = settings.self_control_start;
   const end = settings.self_control_end;
-  const checkins = store.daily_checkins.filter((row) => text(row.entry_date) >= start && text(row.entry_date) <= end);
+  const selfControlEnd = date < end ? date : end;
+  const selfControlTotal = Math.min(Math.max(Math.floor((new Date(`${selfControlEnd}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()) / 86_400_000) + 1, 0), 30);
+  const selfControlBreachDays = new Set(
+    store.urge_logs
+      .filter((row) => {
+        const loggedDate = text(row.logged_at).slice(0, 10);
+        const content = `${text(row.before_urge)} ${text(row.feeling)} ${text(row.delay_action)} ${text(row.result)}`;
+        return loggedDate >= start && loggedDate <= end && isSelfControlBreachText(content);
+      })
+      .map((row) => text(row.logged_at).slice(0, 10)),
+  );
   const finance = {
     saved: store.finance_entries.filter((row) => row.type === '存款').reduce((sum, row) => sum + number(row.amount), 0),
     spent: store.finance_entries.filter((row) => row.type === '支出').reduce((sum, row) => sum + number(row.amount), 0),
@@ -165,7 +177,7 @@ function summary(store: Store) {
     today_todos: ensureTodos(store, date),
     today_aggregates: aggregates(store, date),
     recent_checkins: [...store.daily_checkins].sort((a, b) => desc(a, b, 'entry_date')).slice(0, 30),
-    self_control: { days_logged: checkins.length, breaches: checkins.filter((row) => row.self_control_breach === 1).length, clean_days: checkins.filter((row) => row.self_control_breach !== 1).length, start, end },
+    self_control: { days_logged: selfControlTotal, breaches: selfControlBreachDays.size, clean_days: Math.max(selfControlTotal - selfControlBreachDays.size, 0), start, end },
     finance: { target, initial, saved_entries: finance.saved, spent: finance.spent, income: finance.income, total_savings: total, remaining: Math.max(target - total, 0) },
     body: { exercise_minutes: store.body_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.exercise_minutes), 0), late_days: store.body_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.stayed_up_late), 0) },
     career: { career_minutes: store.career_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.learning_minutes), 0) },

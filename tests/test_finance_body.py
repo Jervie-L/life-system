@@ -130,5 +130,35 @@ class BodyTrendTests(LifeSystemTestCase):
         )
 
 
+class SelfControlSummaryTests(LifeSystemTestCase):
+    def test_interruption_days_are_derived_from_urge_logs(self) -> None:
+        server.insert_urge({
+            "logged_at": "2026-06-02 21:10",
+            "urge_score": 7,
+            "before_urge": "压力大但守住了",
+            "result": "散步十分钟后平复",
+        })
+        server.insert_urge({
+            "logged_at": "2026-06-03 22:20",
+            "urge_score": 9,
+            "before_urge": "刷到擦边内容",
+            "result": "破戒",
+        })
+        server.insert_urge({
+            "logged_at": "2026-06-03 23:00",
+            "urge_score": 8,
+            "result": "再次看片",
+        })
+
+        summary = server.summary()
+
+        self.assertEqual(summary["self_control"]["breaches"], 1)
+        self.assertGreaterEqual(summary["self_control"]["days_logged"], summary["self_control"]["breaches"])
+        self.assertEqual(
+            summary["self_control"]["clean_days"],
+            summary["self_control"]["days_logged"] - summary["self_control"]["breaches"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
