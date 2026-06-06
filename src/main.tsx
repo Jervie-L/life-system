@@ -351,12 +351,13 @@ function App() {
           <div className="topbar-title">
             <button className="mobile-menu-button" aria-label="打开菜单" onClick={() => setDrawerOpen(true)}><Menu size={20} /></button>
             <div>
-              <p>{recordStartDate} 起持续记录</p>
-              <h1>{nav.find(([id]) => id === page)?.[1]}</h1>
+              <p className="topbar-page-kicker">{recordStartDate} 起持续记录</p>
+              <h1><Cloud className="app-title-cloud" size={25} />{nav.find(([id]) => id === page)?.[1]}</h1>
             </div>
           </div>
-          <button className="ghost" onClick={refresh}>
-            刷新数据
+          <button className="ghost topbar-action" onClick={refresh} aria-label="刷新数据">
+            <RefreshCw size={18} />
+            <span>刷新数据</span>
           </button>
         </header>
 
@@ -364,7 +365,7 @@ function App() {
         {notice && <div className="toast">{notice}</div>}
         {!summary && !error && <div className="loading">正在读取本地数据库...</div>}
 
-        {summary && page === 'dashboard' && <Dashboard summary={summary} onSaved={refresh} notify={notify} />}
+        {summary && page === 'dashboard' && <Dashboard summary={summary} onNavigate={setPage} onSaved={refresh} notify={notify} />}
         {summary && page === 'today' && <TodayForm summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'calendar' && <CalendarPage onSaved={refresh} notify={notify} />}
         {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} notify={notify} />}
@@ -379,7 +380,7 @@ function App() {
   );
 }
 
-function Dashboard({ summary, onSaved, notify }: { summary: Summary; onSaved: () => void; notify: (message: string) => void }) {
+function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary; onNavigate: (page: string) => void; onSaved: () => void; notify: (message: string) => void }) {
   const progress = Math.min((summary.finance.total_savings / summary.finance.target) * 100, 100);
 
   return (
@@ -387,10 +388,10 @@ function Dashboard({ summary, onSaved, notify }: { summary: Summary; onSaved: ()
       <EditableHero summary={summary} onSaved={onSaved} notify={notify} />
 
       <div className="grid four metric-grid">
-        <Metric icon={<ShieldCheck />} label="30天自控记录" value={`${summary.self_control.days_logged}/30天`} hint={`中断 ${summary.self_control.breaches} 天`} />
-        <Metric icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} />
-        <Metric icon={<Dumbbell />} label="近7天运动" value={`${summary.body.exercise_minutes || 0}分钟`} hint={`熬夜 ${summary.body.late_days || 0} 天`} />
-        <Metric icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" />
+        <MetricButton icon={<ShieldCheck />} label="30天自控记录" value={`${summary.self_control.days_logged}/30天`} hint={`中断 ${summary.self_control.breaches} 天`} onClick={() => onNavigate('self-control')} />
+        <MetricButton icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} onClick={() => onNavigate('finance')} />
+        <MetricButton icon={<Dumbbell />} label="近7天运动" value={`${summary.body.exercise_minutes || 0}分钟`} hint={`熬夜 ${summary.body.late_days || 0} 天`} onClick={() => onNavigate('body')} />
+        <MetricButton icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" onClick={() => onNavigate('career')} />
       </div>
 
       <div className="panel">
@@ -660,6 +661,20 @@ function Metric({ icon, label, value, hint }: { icon: React.ReactNode; label: st
       <strong>{value}</strong>
       <p>{hint}</p>
     </div>
+  );
+}
+
+function MetricButton({ icon, label, value, hint, onClick }: { icon: React.ReactNode; label: string; value: string; hint: string; onClick: () => void }) {
+  return (
+    <button className="metric metric-button" type="button" onClick={onClick} aria-label={`进入${label}`}>
+      <div className="metric-button-top">
+        <div className="metric-icon">{icon}</div>
+        <ChevronRight size={18} />
+      </div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <p>{hint}</p>
+    </button>
   );
 }
 
