@@ -941,10 +941,7 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
           </div>
         </div>
       </div>
-      <div className="grid two self-control-insights">
-        <StableCalendar checkins={summary.recent_checkins} logs={logs} />
-        <RiskInsights logs={logs} />
-      </div>
+      <RiskInsights logs={logs} />
       <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onDeleted={load} />
     </section>
   );
@@ -953,26 +950,6 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
 function formatCountdown(seconds: number) {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 }
-
-function StableCalendar({ checkins, logs }: { checkins: DailyCheckin[]; logs: Array<{ logged_at?: string }> }) {
-  const checkinMap = new Map(checkins.map(item => [item.entry_date, item]));
-  const urgeDates = new Set(logs.map(log => String(log.logged_at || '').slice(0, 10)));
-  const days = Array.from({ length: 30 }, (_, index) => {
-    const day = new Date();
-    day.setDate(day.getDate() - (29 - index));
-    const key = day.toLocaleDateString('en-CA');
-    const checkin = checkinMap.get(key);
-    const state = checkin?.self_control_breach ? 'breach' : urgeDates.has(key) ? 'urge' : checkin ? 'stable' : 'empty';
-    return { key, label: `${day.getMonth() + 1}/${day.getDate()}`, state };
-  });
-  return <div className="panel">
-    <div className="panel-head"><h3>最近 30 天稳定日历</h3><span>每天守住一次</span></div>
-    <div className="stability-calendar">{days.map(day => <div className={`stability-day ${day.state}`} key={day.key} title={`${day.key} ${stabilityLabels[day.state]}`}><i /><small>{day.label}</small></div>)}</div>
-    <div className="stability-legend"><span><i className="stable" />稳定</span><span><i className="urge" />有冲动</span><span><i className="breach" />破戒</span><span><i className="empty" />未记录</span></div>
-  </div>;
-}
-
-const stabilityLabels: Record<string, string> = { stable: '稳定', urge: '有冲动但未破戒', breach: '破戒', empty: '未记录' };
 
 function RiskInsights({ logs }: { logs: Array<{ logged_at?: string; location?: string; before_urge?: string; delay_action?: string }> }) {
   const recent = logs.slice(0, 30);
