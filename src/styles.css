@@ -1799,6 +1799,35 @@ code {
   margin-top: 5px;
 }
 
+.calendar-layout.embedded {
+  margin: 0;
+}
+
+.calendar-layout.embedded .panel {
+  background: var(--surface);
+}
+
+.finance-record-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, var(--surface) 70%, rgba(255, 255, 255, 0));
+}
+
+.finance-record-actions button {
+  min-width: 120px;
+}
+
+.topbar-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1080px) {
   .calendar-layout {
     grid-template-columns: 1fr;

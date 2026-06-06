@@ -6,12 +6,11 @@ import {
   BarChart3,
   BookOpen,
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Cloud,
-  ClipboardCheck,
+  CloudUpload,
   Dumbbell,
   Home,
   Menu,
@@ -274,6 +273,7 @@ function App() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [syncStatus, setSyncStatus] = useState(() => getSyncStatus());
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   const refresh = async () => {
@@ -291,8 +291,34 @@ function App() {
 
   useEffect(() => {
     if (!useLocalStorage) return;
-    return initializeDataSync(refresh);
+    const unsubscribe = initializeDataSync(refresh);
+    const onStatus = (event: Event) => setSyncStatus((event as CustomEvent).detail);
+    window.addEventListener(SYNC_STATUS_EVENT, onStatus);
+    return () => {
+      unsubscribe();
+      window.removeEventListener(SYNC_STATUS_EVENT, onStatus);
+    };
   }, []);
+
+  const handleTopbarAction = async () => {
+    if (useLocalStorage) {
+      if (isSyncLoggedIn()) {
+        if (syncStatus.state === 'syncing') return;
+        await syncNow();
+      } else {
+        notify('请先在设置中登录同步账号');
+      }
+    } else {
+      await refresh();
+    }
+  };
+
+  const topbarActionLabel = useLocalStorage && isSyncLoggedIn()
+    ? (syncStatus.state === 'syncing' ? '同步中…' : '同步账号数据')
+    : useLocalStorage
+      ? '同步账号数据'
+      : '刷新数据';
+  const topbarActionIcon = useLocalStorage ? <CloudUpload size={18} /> : <RefreshCw size={18} />;
 
   useEffect(() => {
     const resetScroll = () => {
@@ -311,8 +337,6 @@ function App() {
 
   const nav = [
     ['dashboard', '总看板', Home],
-    ['today', '今日打卡', ClipboardCheck],
-    ['calendar', '日历', CalendarDays],
     ['self-control', '自控系统', ShieldCheck],
     ['finance', '存钱系统', PiggyBank],
     ['body', '身体系统', Dumbbell],
@@ -321,7 +345,7 @@ function App() {
     ['reviews', '复盘', BarChart3],
     ['settings', '设置', Settings],
   ] as const;
-  const bottomNav = nav.filter(([id]) => ['dashboard', 'today', 'calendar', 'finance', 'settings'].includes(id));
+  const bottomNav = nav.filter(([id]) => ['dashboard', 'self-control', 'finance', 'body', 'settings'].includes(id));
 
   return (
     <div
@@ -366,9 +390,9 @@ function App() {
               <h1><Cloud className="app-title-cloud" size={25} />{nav.find(([id]) => id === page)?.[1]}</h1>
             </div>
           </div>
-          <button className="ghost topbar-action" onClick={refresh} aria-label="刷新数据">
-            <RefreshCw size={18} />
-            <span>刷新数据</span>
+          <button className="ghost topbar-action" onClick={handleTopbarAction} disabled={useLocalStorage && syncStatus.state === 'syncing'} aria-label={topbarActionLabel}>
+            {topbarActionIcon}
+            <span>{topbarActionLabel}</span>
           </button>
         </header>
 
@@ -377,8 +401,6 @@ function App() {
         {!summary && !error && <div className="loading">正在读取本地数据库...</div>}
 
         {summary && page === 'dashboard' && <Dashboard summary={summary} onNavigate={setPage} onSaved={refresh} notify={notify} />}
-        {summary && page === 'today' && <TodayForm summary={summary} onSaved={refresh} notify={notify} />}
-        {summary && page === 'calendar' && <CalendarPage onSaved={refresh} notify={notify} />}
         {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'finance' && <Finance onSaved={refresh} notify={notify} />}
         {summary && page === 'body' && <Body onSaved={refresh} />}
@@ -391,7 +413,7 @@ function App() {
         {bottomNav.map(([id, label, Icon]) => (
           <button className={page === id ? 'active' : ''} key={id} onClick={() => setPage(id)}>
             <Icon size={21} />
-            <span>{label.replace('总看板', '首页').replace('今日打卡', '待办').replace('存钱系统', '数据')}</span>
+            <span>{label.replace('总看板', '首页').replace('自控系统', '自控').replace('存钱系统', '数据').replace('身体系统', '身体')}</span>
           </button>
         ))}
       </nav>
@@ -413,13 +435,7 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
         <MetricButton icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" onClick={() => onNavigate('career')} />
       </div>
 
-      <div className="panel">
-        <div className="panel-head">
-          <h3>今日待办</h3>
-          <span>{summary.today}</span>
-        </div>
-        <EditableTodos date={summary.today} initialTodos={summary.today_todos || []} onSaved={onSaved} notify={notify} />
-      </div>
+      <CalendarPage onSaved={onSaved} notify={notify} embedded />
 
       <div className="panel">
         <div className="panel-head">
@@ -431,7 +447,7 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
 
       <div className="life-pillars" aria-label="人生系统四个核心模块">
         <button onClick={() => onNavigate('self-control')}>
-          <ClipboardCheck size={28} />
+          <ShieldCheck size={28} />
           <span>自律打卡</span>
           <small>养成好习惯</small>
         </button>
@@ -581,7 +597,7 @@ function EditableTodos({ date, initialTodos, onSaved, notify }: { date: string; 
   );
 }
 
-function CalendarPage({ onSaved, notify }: { onSaved: () => void; notify: (message: string) => void }) {
+function CalendarPage({ onSaved, notify, embedded = false }: { onSaved: () => void; notify: (message: string) => void; embedded?: boolean }) {
   const current = new Date();
   const [month, setMonth] = useState(() => new Date(current.getFullYear(), current.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(today());
@@ -632,58 +648,74 @@ function CalendarPage({ onSaved, notify }: { onSaved: () => void; notify: (messa
     onSaved();
   };
 
+  const calendarPanel = (
+    <div className={`panel calendar-panel ${embedded ? 'embedded' : ''}`}>
+      <div className="calendar-toolbar">
+        <div>
+          <p>按月查看待办安排</p>
+          <h2>{year}年{monthIndex + 1}月</h2>
+        </div>
+        <div className="calendar-actions">
+          <button className="ghost" aria-label="上个月" onClick={() => moveMonth(-1)}><ChevronLeft size={18} /></button>
+          <button className="ghost" onClick={() => { setMonth(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(today()); }}>今天</button>
+          <button className="ghost" aria-label="下个月" onClick={() => moveMonth(1)}><ChevronRight size={18} /></button>
+        </div>
+      </div>
+      <div className="calendar-weekdays">
+        {['一', '二', '三', '四', '五', '六', '日'].map(day => <span key={day}>周{day}</span>)}
+      </div>
+      <div className="calendar-grid">
+        {cells.map((day, index) => {
+          if (!day) return <span className="calendar-cell empty" key={`empty-${index}`} />;
+          const date = formatLocalDate(new Date(year, monthIndex, day));
+          const dayTodos = todosByDate[date] || [];
+          const doneCount = dayTodos.filter(todo => todo.is_done).length;
+          return (
+            <button
+              className={`calendar-cell${selectedDate === date ? ' selected' : ''}${date === today() ? ' today' : ''}`}
+              key={date}
+              onClick={() => setSelectedDate(date)}
+            >
+              <span className="calendar-day">{day}</span>
+              {dayTodos.length > 0 && (
+                <>
+                  <span className="calendar-todo-count">{doneCount}/{dayTodos.length}</span>
+                  <span className="calendar-dot-row">{dayTodos.slice(0, 3).map(todo => <i className={todo.is_done ? 'done' : ''} key={todo.id} />)}</span>
+                </>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {loading && <p className="calendar-loading">正在读取待办...</p>}
+    </div>
+  );
+
+  const detailPanel = (
+    <div className="panel calendar-detail">
+      <div className="panel-head">
+        <div>
+          <h3>{selectedDate} 待办</h3>
+          <p>{selectedTodos.length ? `共 ${selectedTodos.length} 项，已完成 ${selectedTodos.filter(todo => todo.is_done).length} 项` : '当天还没有安排'}</p>
+        </div>
+      </div>
+      <EditableTodos date={selectedDate} initialTodos={selectedTodos} onSaved={handleSaved} notify={notify} />
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div className="calendar-layout embedded">
+        {calendarPanel}
+        {detailPanel}
+      </div>
+    );
+  }
+
   return (
     <section className="calendar-layout">
-      <div className="panel calendar-panel">
-        <div className="calendar-toolbar">
-          <div>
-            <p>按月查看待办安排</p>
-            <h2>{year}年{monthIndex + 1}月</h2>
-          </div>
-          <div className="calendar-actions">
-            <button className="ghost" aria-label="上个月" onClick={() => moveMonth(-1)}><ChevronLeft size={18} /></button>
-            <button className="ghost" onClick={() => { setMonth(new Date(current.getFullYear(), current.getMonth(), 1)); setSelectedDate(today()); }}>今天</button>
-            <button className="ghost" aria-label="下个月" onClick={() => moveMonth(1)}><ChevronRight size={18} /></button>
-          </div>
-        </div>
-        <div className="calendar-weekdays">
-          {['一', '二', '三', '四', '五', '六', '日'].map(day => <span key={day}>周{day}</span>)}
-        </div>
-        <div className="calendar-grid">
-          {cells.map((day, index) => {
-            if (!day) return <span className="calendar-cell empty" key={`empty-${index}`} />;
-            const date = formatLocalDate(new Date(year, monthIndex, day));
-            const dayTodos = todosByDate[date] || [];
-            const doneCount = dayTodos.filter(todo => todo.is_done).length;
-            return (
-              <button
-                className={`calendar-cell${selectedDate === date ? ' selected' : ''}${date === today() ? ' today' : ''}`}
-                key={date}
-                onClick={() => setSelectedDate(date)}
-              >
-                <span className="calendar-day">{day}</span>
-                {dayTodos.length > 0 && (
-                  <>
-                    <span className="calendar-todo-count">{doneCount}/{dayTodos.length}</span>
-                    <span className="calendar-dot-row">{dayTodos.slice(0, 3).map(todo => <i className={todo.is_done ? 'done' : ''} key={todo.id} />)}</span>
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </div>
-        {loading && <p className="calendar-loading">正在读取待办...</p>}
-      </div>
-
-      <div className="panel calendar-detail">
-        <div className="panel-head">
-          <div>
-            <h3>{selectedDate} 待办</h3>
-            <p>{selectedTodos.length ? `共 ${selectedTodos.length} 项，已完成 ${selectedTodos.filter(todo => todo.is_done).length} 项` : '当天还没有安排'}</p>
-          </div>
-        </div>
-        <EditableTodos date={selectedDate} initialTodos={selectedTodos} onSaved={handleSaved} notify={notify} />
-      </div>
+      {calendarPanel}
+      {detailPanel}
     </section>
   );
 }
@@ -717,78 +749,6 @@ function MetricButton({ icon, label, value, hint, onClick }: { icon: React.React
       <strong>{value}</strong>
       <p>{hint}</p>
     </button>
-  );
-}
-
-function TodayForm({ summary, onSaved, notify }: { summary: Summary; onSaved: () => void; notify: (message: string) => void }) {
-  const existing = summary.today_checkin;
-  const syncedForm = () => ({
-    entry_date: summary.today,
-    phone_outside: false,
-    self_control_breach: Boolean(existing?.self_control_breach ?? summary.today_aggregates?.self_control_breach),
-    masturbation: Boolean(existing?.masturbation ?? summary.today_aggregates?.masturbation),
-    urge_score: existing?.urge_score || summary.today_aggregates?.urge_score || 0,
-    trigger: existing?.trigger || summary.today_aggregates?.trigger || '',
-    replacement: existing?.replacement || summary.today_aggregates?.replacement || '',
-    expense_amount: existing?.expense_amount ?? summary.today_aggregates?.expense_amount ?? 0,
-    exercise_minutes: existing?.exercise_minutes ?? summary.today_aggregates?.exercise_minutes ?? 0,
-    career_minutes: existing?.career_minutes ?? summary.today_aggregates?.career_minutes ?? 0,
-    did_right: existing?.did_right || '',
-    avoid_tomorrow: existing?.avoid_tomorrow || '',
-    tomorrow_tasks: existing?.tomorrow_tasks || '',
-  });
-  const [form, setForm] = useState(syncedForm);
-
-  useEffect(() => {
-    setForm(syncedForm());
-  }, [summary.today, summary.today_checkin, summary.today_aggregates]);
-
-  const save = async () => {
-    await api.send('/api/daily-checkins', 'POST', form);
-    notify('今日打卡已保存。');
-    onSaved();
-  };
-
-  const syncSystems = () => {
-    const aggregates = summary.today_aggregates;
-    setForm({
-      ...form,
-      self_control_breach: Boolean(aggregates?.self_control_breach),
-      masturbation: Boolean(aggregates?.masturbation),
-      urge_score: aggregates?.urge_score || 0,
-      trigger: aggregates?.trigger || form.trigger,
-      replacement: aggregates?.replacement || form.replacement,
-      expense_amount: aggregates?.expense_amount || 0,
-      exercise_minutes: aggregates?.exercise_minutes || 0,
-      career_minutes: aggregates?.career_minutes || 0,
-    });
-    notify('已同步四个系统的今日数据。');
-  };
-
-  return (
-    <section className="panel wide">
-      <div className="panel-head">
-        <h3>今日六件事</h3>
-        <div className="actions">
-          <button className="ghost" onClick={syncSystems}>同步四系统数据</button>
-          <button onClick={save}><Save size={16} /> 保存今日打卡</button>
-        </div>
-      </div>
-      <div className="form-grid today-grid">
-        <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-        <Toggle label="观看色情/擦边内容" checked={form.self_control_breach} onChange={v => setForm({ ...form, self_control_breach: v })} />
-        <Toggle label="手淫" checked={form.masturbation} onChange={v => setForm({ ...form, masturbation: v })} />
-        <Field label="最大冲动 1-10"><NumberInput min={0} max={10} value={form.urge_score} onChange={value => setForm({ ...form, urge_score: value })} /></Field>
-        <Field label="触发点"><input value={form.trigger} onChange={e => setForm({ ...form, trigger: e.target.value })} placeholder="深夜 / 压力 / 无聊 / 游戏后" /></Field>
-        <Field label="替代行为"><input value={form.replacement} onChange={e => setForm({ ...form, replacement: e.target.value })} placeholder="运动 / 学习 / 整理" /></Field>
-        <Field label="今日支出"><NumberInput precision={2} value={form.expense_amount} onChange={value => setForm({ ...form, expense_amount: value })} /></Field>
-        <Field label="运动/拉伸分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
-        <Field label="事业学习分钟"><NumberInput value={form.career_minutes} onChange={value => setForm({ ...form, career_minutes: value })} /></Field>
-        <Field label="今天做对的一件事" className="field-long"><textarea value={form.did_right} onChange={e => setForm({ ...form, did_right: e.target.value })} /></Field>
-        <Field label="明天要避开的场景" className="field-long"><textarea value={form.avoid_tomorrow} onChange={e => setForm({ ...form, avoid_tomorrow: e.target.value })} /></Field>
-        <Field label="明天三件事" className="field-long"><textarea value={form.tomorrow_tasks} onChange={e => setForm({ ...form, tomorrow_tasks: e.target.value })} placeholder={'1.\n2.\n3.'} /></Field>
-      </div>
-    </section>
   );
 }
 
@@ -950,7 +910,7 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
       <div className="grid four metric-grid">
         <Metric icon={<ShieldCheck />} label="30天打卡" value={`${summary.self_control.days_logged}/30天`} hint={`稳定 ${summary.self_control.clean_days} 天`} />
         <Metric icon={<Activity />} label="冲动记录" value={`${logs.length}条`} hint="来自下方冲动记录" />
-        <Metric icon={<ClipboardCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="用于识别高危场景" />
+        <Metric icon={<ShieldCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="用于识别高危场景" />
         <Metric icon={<BarChart3 />} label="本周冲动" value={`${weeklyUrgeCount(logs)}条`} hint="最近7天记录" />
       </div>
       <div className="grid two">
@@ -1198,18 +1158,27 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
           </>} onSave={saveAccount} table={null} />}
         </div>
         <div className={`finance-pane ${activePane === 1 ? 'active' : ''}`}>
-          <RecordPage title={editingEntryId ? '修改财务记录' : '新增财务记录'} button={editingEntryId ? '保存修改' : '保存记录'} form={<>
-            <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
-            <Field label="类型"><select value={form.type} onChange={e => {
-              const type = e.target.value as keyof typeof financeCategories;
-              setForm({ ...form, type, category: financeCategories[type][0] });
-            }}><option>支出</option><option>收入</option><option>存款</option></select></Field>
-            <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
-            <Field label="金额"><NumberInput precision={2} value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
-            <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategoryOptions(form.type, form.category).map(category => <option key={category}>{category}</option>)}</select></Field>
-            <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
-            {editingEntryId > 0 && <button className="ghost" onClick={cancelEditEntry}>取消编辑</button>}
-          </>} onSave={save} table={null} />
+          <div className="panel wide">
+            <div className="panel-head">
+              <h3>{editingEntryId ? '修改财务记录' : '新增财务记录'}</h3>
+              <span>{form.entry_date}</span>
+            </div>
+            <div className="form-grid finance-record-form">
+              <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
+              <Field label="类型"><select value={form.type} onChange={e => {
+                const type = e.target.value as keyof typeof financeCategories;
+                setForm({ ...form, type, category: financeCategories[type][0] });
+              }}><option>支出</option><option>收入</option><option>存款</option></select></Field>
+              <Field label="资金账户"><select value={form.account_id} onChange={e => setForm({ ...form, account_id: Number(e.target.value) })}>{accounts.map(account => <option key={account.id} value={account.id}>{account.name}</option>)}</select></Field>
+              <Field label="金额"><NumberInput precision={2} value={form.amount} onChange={amount => setForm({ ...form, amount })} /></Field>
+              <Field label="分类"><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>{financeCategoryOptions(form.type, form.category).map(category => <option key={category}>{category}</option>)}</select></Field>
+              <Field label="备注"><input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></Field>
+            </div>
+            <div className="finance-record-actions">
+              {editingEntryId > 0 && <button className="ghost" onClick={cancelEditEntry}>取消编辑</button>}
+              <button onClick={save}><Save size={16} /> {editingEntryId ? '保存修改' : '保存记录'}</button>
+            </div>
+          </div>
         </div>
         <div className={`finance-pane ${activePane === 2 ? 'active' : ''}`}>
           <div className="panel finance-filter-panel">
