@@ -2619,9 +2619,15 @@ code {
   --surface: rgba(255, 253, 248, 0.96);
   --surface-soft: #f7f5ef;
   --surface-tint: #eaf6ff;
+  background: var(--dm-blue);
+}
+
+html {
+  background: var(--dm-blue);
 }
 
 body {
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   color: var(--ink);
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 18%, rgba(0, 0, 0, 0.05) 21%, transparent 35%),

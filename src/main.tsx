@@ -294,6 +294,16 @@ function App() {
     return initializeDataSync(refresh);
   }, []);
 
+  useEffect(() => {
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    resetScroll();
+    window.requestAnimationFrame(resetScroll);
+  }, [page]);
+
   const notify = (message: string) => {
     setNotice(message);
     window.setTimeout(() => setNotice(''), 1800);
