@@ -2881,10 +2881,55 @@ tr {
 .hero-content input,
 .hero-content textarea,
 .todo-add input,
-.note-search input {
-  border-color: rgba(0, 100, 156, 0.2);
-  border-radius: 12px;
-  background: #fff;
+.note-search input,
+.sync-code-row input {
+  min-height: 48px;
+  border: 1px solid rgba(0, 100, 156, 0.18);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 252, 255, 0.96));
+  color: #172027;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(0, 80, 126, 0.06),
+    0 7px 18px rgba(46, 57, 63, 0.07);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
+}
+
+.field input::placeholder,
+.field textarea::placeholder,
+.hero-content input::placeholder,
+.hero-content textarea::placeholder,
+.todo-add input::placeholder,
+.note-search input::placeholder,
+.sync-code-row input::placeholder {
+  color: rgba(93, 106, 112, 0.55);
+}
+
+.field select {
+  padding-right: 42px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #075881 50%),
+    linear-gradient(135deg, #075881 50%, transparent 50%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 252, 255, 0.96));
+  background-position:
+    calc(100% - 23px) 50%,
+    calc(100% - 15px) 50%,
+    0 0;
+  background-size:
+    8px 8px,
+    8px 8px,
+    100% 100%;
+  background-repeat: no-repeat;
+  appearance: none;
+}
+
+.date-text-input {
+  letter-spacing: 0.01em;
 }
 
 .field input:focus,
@@ -2892,9 +2937,51 @@ tr {
 .field select:focus,
 .hero-content input:focus,
 .hero-content textarea:focus,
-.note-search input:focus {
+.todo-add input:focus,
+.note-search input:focus,
+.sync-code-row input:focus {
   border-color: var(--dm-blue);
-  box-shadow: 0 0 0 4px rgba(0, 118, 170, 0.12);
+  background: linear-gradient(180deg, #ffffff, #f4fbff);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 1),
+    0 0 0 4px rgba(0, 118, 170, 0.13),
+    0 12px 24px rgba(0, 91, 144, 0.12);
+  outline: none;
+}
+
+.field input:disabled,
+.field textarea:disabled,
+.field select:disabled {
+  color: rgba(70, 82, 88, 0.52);
+  background: linear-gradient(180deg, #eef2f3, #e8edef);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.decimal-input {
+  gap: 8px;
+}
+
+.decimal-input input {
+  border-top-right-radius: 15px;
+  border-bottom-right-radius: 15px;
+}
+
+.decimal-key {
+  min-width: 50px;
+  border: 1px solid rgba(0, 100, 156, 0.18);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(232, 246, 255, 0.96));
+  color: #075881;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.95),
+    0 7px 18px rgba(46, 57, 63, 0.07);
+}
+
+.todo input {
+  min-height: 36px;
+  border-radius: 10px;
+  box-shadow: none;
 }
 
 .finance-tabs {

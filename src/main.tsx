@@ -1104,7 +1104,9 @@ function Finance({ onSaved, notify }: { onSaved: () => void; notify: (message: s
   const scrollFinanceTop = () => {
     if (!window.matchMedia('(max-width: 680px)').matches) return;
     window.requestAnimationFrame(() => {
-      sectionRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
     });
   };
   const showPane = (index: number) => {
