@@ -429,7 +429,7 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
       <EditableHero summary={summary} onSaved={onSaved} notify={notify} />
 
       <div className="grid four metric-grid">
-        <MetricButton icon={<ShieldCheck />} label="30天自控记录" value={`${summary.self_control.days_logged}/30天`} hint={`中断 ${summary.self_control.breaches} 天`} onClick={() => onNavigate('self-control')} />
+        <MetricButton icon={<ShieldCheck />} label="禁欲天数" value={`${summary.self_control.days_logged}天`} hint={`中断 ${summary.self_control.breaches} 次`} onClick={() => onNavigate('self-control')} />
         <MetricButton icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} onClick={() => onNavigate('finance')} />
         <MetricButton icon={<Dumbbell />} label="近7天运动" value={`${summary.body.exercise_minutes || 0}分钟`} hint={`熬夜 ${summary.body.late_days || 0} 天`} onClick={() => onNavigate('body')} />
         <MetricButton icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" onClick={() => onNavigate('career')} />
@@ -869,10 +869,12 @@ const motivationTracks = [
 function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: () => void; notify: (message: string) => void }) {
   const [logs, setLogs] = useState<any[]>([]);
   const [form, setForm] = useState({ logged_at: new Date().toISOString().slice(0, 16).replace('T', ' '), urge_score: 5, location: '', before_urge: '', feeling: '', delay_action: '', result: '' });
+  const [editingLogId, setEditingLogId] = useState(0);
   const [motivationIndex, setMotivationIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [emergencySeconds, setEmergencySeconds] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const formPanelRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
     setLogs(await api.get('/api/urge-logs'));
@@ -884,11 +886,31 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
     return () => window.clearInterval(timer);
   }, [emergencySeconds]);
 
+  const resetForm = () => {
+    setEditingLogId(0);
+    setForm({ logged_at: new Date().toISOString().slice(0, 16).replace('T', ' '), urge_score: 5, location: '', before_urge: '', feeling: '', delay_action: '', result: '' });
+  };
+
   const save = async () => {
-    await api.send('/api/urge-logs', 'POST', form);
-    setForm({ ...form, before_urge: '', feeling: '', delay_action: '', result: '' });
+    await api.send(editingLogId ? `/api/urge-logs/${editingLogId}` : '/api/urge-logs', editingLogId ? 'PUT' : 'POST', form);
+    resetForm();
     await load();
     onSaved();
+    notify(editingLogId ? '冲动记录已更新。' : '冲动记录已保存。');
+  };
+
+  const editLog = (log: any) => {
+    setEditingLogId(log.id);
+    setForm({
+      logged_at: String(log.logged_at || ''),
+      urge_score: Number(log.urge_score || 0),
+      location: String(log.location || ''),
+      before_urge: String(log.before_urge || ''),
+      feeling: String(log.feeling || ''),
+      delay_action: String(log.delay_action || ''),
+      result: String(log.result || ''),
+    });
+    window.requestAnimationFrame(() => formPanelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   };
 
   const playMotivation = async () => {
@@ -908,14 +930,20 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
   return (
     <section className="stack">
       <div className="grid four metric-grid">
-        <Metric icon={<ShieldCheck />} label="30天打卡" value={`${summary.self_control.days_logged}/30天`} hint={`稳定 ${summary.self_control.clean_days} 天`} />
-        <Metric icon={<Activity />} label="冲动记录" value={`${logs.length}条`} hint="来自下方冲动记录" />
-        <Metric icon={<ShieldCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="用于识别高危场景" />
+        <Metric icon={<ShieldCheck />} label="禁欲天数" value={`${summary.self_control.days_logged}天`} hint="破戒后自动清零重算" />
+        <Metric icon={<Activity />} label="中断次数" value={`${summary.self_control.breaches}次`} hint="按冲动记录条数统计" />
+        <Metric icon={<ShieldCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="来自冲动记录" />
         <Metric icon={<BarChart3 />} label="本周冲动" value={`${weeklyUrgeCount(logs)}条`} hint="最近7天记录" />
       </div>
       <div className="grid two">
-        <div className="panel">
-          <div className="panel-head"><h3>冲动记录</h3><button onClick={save}><Plus size={16} /> 添加</button></div>
+        <div className="panel" ref={formPanelRef}>
+          <div className="panel-head">
+            <h3>{editingLogId ? '编辑冲动记录' : '冲动记录'}</h3>
+            <div className="inline-actions">
+              {editingLogId > 0 && <button className="icon" onClick={resetForm} aria-label="取消编辑" title="取消编辑"><X size={15} /></button>}
+              <button className="icon" onClick={save} aria-label={editingLogId ? '保存修改' : '添加冲动记录'} title={editingLogId ? '保存修改' : '添加冲动记录'}>{editingLogId ? <Save size={15} /> : <Plus size={15} />}</button>
+            </div>
+          </div>
           <div className="form-grid compact urge-grid">
             <Field label="时间"><DateInput withTime value={form.logged_at} onChange={logged_at => setForm({ ...form, logged_at })} /></Field>
             <Field label="冲动 1-10"><NumberInput min={1} max={10} value={form.urge_score} onChange={value => setForm({ ...form, urge_score: value })} /></Field>
@@ -941,37 +969,13 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
           </div>
         </div>
       </div>
-      <RiskInsights logs={logs} />
-      <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onDeleted={load} />
+      <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onEdit={editLog} onDeleted={async () => { await load(); onSaved(); }} />
     </section>
   );
 }
 
 function formatCountdown(seconds: number) {
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-function RiskInsights({ logs }: { logs: Array<{ logged_at?: string; location?: string; before_urge?: string; delay_action?: string }> }) {
-  const recent = logs.slice(0, 30);
-  const highRiskHour = mostCommon(recent.map(log => {
-    const hour = Number(String(log.logged_at || '').slice(11, 13));
-    return Number.isNaN(hour) ? '' : `${String(hour).padStart(2, '0')}:00 - ${String((hour + 1) % 24).padStart(2, '0')}:00`;
-  }));
-  const cards = [
-    ['高危时段', highRiskHour],
-    ['高频地点', mostCommon(recent.map(log => log.location || ''))],
-    ['常见诱因', mostCommon(recent.map(log => log.before_urge || ''))],
-    ['有效替代动作', mostCommon(recent.map(log => log.delay_action || ''))],
-  ];
-  return <div className="panel">
-    <div className="panel-head"><h3>高危场景摘要</h3><span>最近 {recent.length} 条记录</span></div>
-    <div className="risk-insights">{cards.map(([label, value]) => <div key={label}><small>{label}</small><strong>{value || '等待记录'}</strong></div>)}</div>
-  </div>;
-}
-
-function mostCommon(values: string[]) {
-  const counts = values.map(value => value.trim()).filter(Boolean).reduce<Record<string, number>>((result, value) => ({ ...result, [value]: (result[value] || 0) + 1 }), {});
-  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
 function maxUrgeScore(logs: Array<{ urge_score?: number }>) {

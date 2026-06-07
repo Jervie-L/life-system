@@ -42,8 +42,9 @@ const text = (value: unknown, fallback = '') => String(value ?? fallback);
 const number = (value: unknown) => Number(String(value ?? '').trim().replace(',', '.')) || 0;
 const optionalNumber = (value: unknown) => value === '' || value == null ? null : number(value);
 const boolInt = (value: unknown) => value === true || value === 1 || value === '1' || value === 'true' || value === 'on' ? 1 : 0;
-const selfControlBreachWords = ['破戒', '色情', '擦边', '看片', '手淫'];
+const selfControlBreachWords = ['破戒', '看片', '手淫'];
 const isSelfControlBreachText = (value: string) => selfControlBreachWords.some((word) => value.includes(word));
+const urgeLogText = (row: Row) => `${text(row.before_urge)} ${text(row.feeling)} ${text(row.delay_action)} ${text(row.result)}`;
 
 function initialStore(): Store {
   const counters = Object.fromEntries(tables.map((table) => [table, 0])) as Record<Table, number>;
@@ -150,16 +151,18 @@ function summary(store: Store) {
   const start = settings.self_control_start;
   const end = settings.self_control_end;
   const selfControlEnd = date < end ? date : end;
-  const selfControlTotal = Math.min(Math.max(Math.floor((new Date(`${selfControlEnd}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()) / 86_400_000) + 1, 0), 30);
-  const selfControlBreachDays = new Set(
-    store.urge_logs
-      .filter((row) => {
-        const loggedDate = text(row.logged_at).slice(0, 10);
-        const content = `${text(row.before_urge)} ${text(row.feeling)} ${text(row.delay_action)} ${text(row.result)}`;
-        return loggedDate >= start && loggedDate <= end && isSelfControlBreachText(content);
-      })
-      .map((row) => text(row.logged_at).slice(0, 10)),
-  );
+  const selfControlUrges = store.urge_logs.filter((row) => {
+    const loggedDate = text(row.logged_at).slice(0, 10);
+    return loggedDate >= start && loggedDate <= selfControlEnd;
+  });
+  const lastBreachDate = selfControlUrges
+    .filter((row) => isSelfControlBreachText(urgeLogText(row)))
+    .map((row) => text(row.logged_at).slice(0, 10))
+    .sort()
+    .pop();
+  const selfControlBaseDate = lastBreachDate ?? start;
+  const selfControlElapsed = Math.floor((new Date(`${selfControlEnd}T00:00:00`).getTime() - new Date(`${selfControlBaseDate}T00:00:00`).getTime()) / 86_400_000);
+  const selfControlTotal = Math.max(selfControlElapsed + (lastBreachDate ? 0 : 1), 0);
   const finance = {
     saved: store.finance_entries.filter((row) => row.type === '存款').reduce((sum, row) => sum + number(row.amount), 0),
     spent: store.finance_entries.filter((row) => row.type === '支出').reduce((sum, row) => sum + number(row.amount), 0),
@@ -177,7 +180,7 @@ function summary(store: Store) {
     today_todos: ensureTodos(store, date),
     today_aggregates: aggregates(store, date),
     recent_checkins: [...store.daily_checkins].sort((a, b) => desc(a, b, 'entry_date')).slice(0, 30),
-    self_control: { days_logged: selfControlTotal, breaches: selfControlBreachDays.size, clean_days: Math.max(selfControlTotal - selfControlBreachDays.size, 0), start, end },
+    self_control: { days_logged: selfControlTotal, breaches: selfControlUrges.length, clean_days: selfControlTotal, start, end },
     finance: { target, initial, saved_entries: finance.saved, spent: finance.spent, income: finance.income, total_savings: total, remaining: Math.max(target - total, 0) },
     body: { exercise_minutes: store.body_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.exercise_minutes), 0), late_days: store.body_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.stayed_up_late), 0) },
     career: { career_minutes: store.career_logs.filter((row) => text(row.entry_date) >= week).reduce((sum, row) => sum + number(row.learning_minutes), 0) },
@@ -319,6 +322,17 @@ function put(store: Store, path: string, data: Record<string, unknown>): unknown
       type: text(data.type, '支出'),
       amount: currency(data.amount),
       account_id: requiredAccountId(store, data.account_id),
+    });
+    return row;
+  }
+  const urgeMatch = path.match(/^\/api\/urge-logs\/(\d+)$/);
+  if (urgeMatch) {
+    const row = store.urge_logs.find((item) => item.id === Number(urgeMatch[1]));
+    if (!row) throw new Error('冲动记录不存在');
+    Object.assign(row, {
+      ...data,
+      logged_at: text(data.logged_at, timestamp()),
+      urge_score: number(data.urge_score),
     });
     return row;
   }

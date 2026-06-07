@@ -196,6 +196,14 @@ h3 {
   color: #fff;
 }
 
+.inline-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .hero-content input,
 .hero-content textarea {
   width: 100%;

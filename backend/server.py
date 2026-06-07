@@ -253,11 +253,15 @@ def settings_dict() -> dict:
     return {row["key"]: row["value"] for row in rows("SELECT key, value FROM settings")}
 
 
-SELF_CONTROL_BREACH_WORDS = ("破戒", "色情", "擦边", "看片", "手淫")
+SELF_CONTROL_BREACH_WORDS = ("破戒", "看片", "手淫")
 
 
 def is_self_control_breach_text(value: str) -> bool:
     return any(word in value for word in SELF_CONTROL_BREACH_WORDS)
+
+
+def urge_log_text(row: dict) -> str:
+    return " ".join(str(row.get(key) or "") for key in ("before_urge", "feeling", "delay_action", "result"))
 
 
 def summary() -> dict:
@@ -297,22 +301,26 @@ def summary() -> dict:
         WHERE entry_date >= date('now', '-6 day')
         """
     )
-    self_control_total = max((date.fromisoformat(min(today, end)) - date.fromisoformat(start)).days + 1, 0)
-    self_control_total = min(self_control_total, 30)
+    self_control_end = min(today, end)
     urge_rows = rows(
         """
         SELECT logged_at, before_urge, feeling, delay_action, result
         FROM urge_logs
         WHERE substr(logged_at, 1, 10) BETWEEN ? AND ?
         """,
-        (start, end),
+        (start, self_control_end),
     )
-    self_control_breach_days = {
+    self_control_breach_dates = [
         row["logged_at"][:10]
         for row in urge_rows
-        if is_self_control_breach_text(" ".join(str(row.get(key) or "") for key in ("before_urge", "feeling", "delay_action", "result")))
-    }
-    self_control_breaches = len(self_control_breach_days)
+        if is_self_control_breach_text(urge_log_text(row))
+    ]
+    last_breach_date = max(self_control_breach_dates, default="")
+    if last_breach_date:
+        self_control_total = max((date.fromisoformat(self_control_end) - date.fromisoformat(last_breach_date)).days, 0)
+    else:
+        self_control_total = max((date.fromisoformat(self_control_end) - date.fromisoformat(start)).days + 1, 0)
+    self_control_breaches = len(urge_rows)
     total_savings = float(initial) + float(finance["saved"]) + float(finance["income"]) - float(finance["spent"])
     return {
         "settings": settings,
@@ -324,7 +332,7 @@ def summary() -> dict:
         "self_control": {
             "days_logged": self_control_total,
             "breaches": self_control_breaches,
-            "clean_days": max(self_control_total - self_control_breaches, 0),
+            "clean_days": self_control_total,
             "start": start,
             "end": end,
         },
@@ -567,6 +575,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path.startswith("/api/finance/"):
                 item_id = int(path.rsplit("/", 1)[1])
                 self.send_json(update_finance(item_id, data))
+            elif path.startswith("/api/urge-logs/"):
+                item_id = int(path.rsplit("/", 1)[1])
+                self.send_json(update_urge(item_id, data))
             else:
                 self.send_json({"error": "Not found"}, 404)
         except Exception as exc:
@@ -661,6 +672,31 @@ def insert_urge(data: dict) -> dict:
             values,
         )
         row = db.execute("SELECT * FROM urge_logs WHERE id = ?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def update_urge(item_id: int, data: dict) -> dict:
+    with connect() as db:
+        if not db.execute("SELECT id FROM urge_logs WHERE id = ?", (item_id,)).fetchone():
+            raise ValueError("冲动记录不存在")
+        db.execute(
+            """
+            UPDATE urge_logs
+            SET logged_at = ?, urge_score = ?, location = ?, before_urge = ?, feeling = ?, delay_action = ?, result = ?
+            WHERE id = ?
+            """,
+            (
+                data.get("logged_at") or now(),
+                int(data.get("urge_score") or 0),
+                data.get("location", ""),
+                data.get("before_urge", ""),
+                data.get("feeling", ""),
+                data.get("delay_action", ""),
+                data.get("result", ""),
+                item_id,
+            ),
+        )
+        row = db.execute("SELECT * FROM urge_logs WHERE id = ?", (item_id,)).fetchone()
         return dict(row)
 
 
