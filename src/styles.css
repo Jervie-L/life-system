@@ -4514,3 +4514,343 @@ button.ghost:not(.topbar-action),
     min-height: 154px;
   }
 }
+
+/* final v19: white workspace, compact forms */
+html,
+body,
+.app {
+  background: #fff !important;
+}
+
+body {
+  color: #111827;
+}
+
+.app {
+  background-image: none !important;
+}
+
+main {
+  background: #fff;
+}
+
+.sidebar {
+  color: #111827;
+  background: #fff !important;
+  border-right: 1px solid #e5e7eb;
+  box-shadow: 14px 0 34px rgba(15, 23, 42, 0.08);
+}
+
+.brand {
+  color: #111827;
+}
+
+.brand-mark {
+  color: #fff;
+  background: linear-gradient(180deg, #16a4df, #006aa5);
+  border-radius: 14px;
+}
+
+.brand span,
+nav button {
+  color: #64748b;
+}
+
+nav button {
+  background: transparent !important;
+  border: 1px solid transparent;
+}
+
+nav button.active,
+nav button:hover {
+  color: #006aa5;
+  background: #eff8ff !important;
+  border-color: #d9efff;
+  box-shadow: inset 4px 0 #0078bd;
+}
+
+.drawer-backdrop {
+  background: rgba(15, 23, 42, 0.22) !important;
+}
+
+.topbar {
+  background:
+    radial-gradient(circle at 18% 0, rgba(116, 196, 255, 0.32), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #0e94dc 0%, #0078bd 48%, #005a92 100%) !important;
+}
+
+.panel,
+.hero,
+.metric,
+.note-card,
+.sync-card,
+.system-hero,
+.finance-account,
+.expense-ranking-row,
+.checklist button,
+.route button,
+.todo,
+.calendar-cell,
+tbody tr {
+  background: #fff !important;
+  border-color: #e5e7eb !important;
+  box-shadow:
+    0 8px 22px rgba(15, 23, 42, 0.06),
+    inset 0 1px rgba(255, 255, 255, 0.9) !important;
+}
+
+.calendar-layout.embedded .panel,
+.finance-tabs,
+.mobile-tabbar {
+  background: #fff !important;
+}
+
+.stack {
+  gap: 14px;
+}
+
+.panel,
+.metric,
+.system-hero {
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.panel-head {
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+
+.panel-head h3 {
+  font-size: 17px;
+}
+
+.grid {
+  gap: 12px;
+}
+
+.form-grid,
+.form-grid.compact,
+.finance-record-form,
+.body-record-form {
+  gap: 10px;
+}
+
+.field,
+.body-record-form .field,
+.toggle,
+.body-record-form .toggle {
+  min-height: auto;
+  padding: 9px 10px;
+  border-radius: 14px;
+  background: #fff !important;
+  border-color: #e2e8f0;
+}
+
+.field span,
+.setting-switch strong {
+  margin-bottom: 5px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.field input,
+.field textarea,
+.field select,
+.hero-content input,
+.hero-content textarea,
+.todo-add input,
+.note-search input,
+.sync-code-row input,
+.body-record-form .field input,
+.body-record-form .field textarea,
+.body-record-form .field select {
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 13px;
+  border-color: #d9e2ec;
+  background: #fff !important;
+  box-shadow:
+    inset 0 1px 2px rgba(15, 23, 42, 0.06),
+    0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.field textarea,
+.hero-content textarea,
+.body-record-form .field textarea {
+  min-height: 68px;
+}
+
+.urge-grid .field-long textarea {
+  min-height: 74px;
+}
+
+.decimal-input {
+  gap: 5px;
+}
+
+button.decimal-key {
+  flex-basis: 40px;
+  min-height: 42px;
+  background: #eff8ff;
+  color: #006aa5;
+}
+
+.inline-actions {
+  gap: 8px;
+}
+
+.icon,
+.form-icon-button {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 14px;
+  color: #006aa5;
+  background: linear-gradient(180deg, #f5fbff, #e2f3ff) !important;
+  box-shadow: 0 6px 14px rgba(0, 106, 165, 0.14);
+}
+
+.form-icon-button svg {
+  width: 24px !important;
+  height: 24px !important;
+  stroke-width: 3;
+}
+
+.icon.danger {
+  color: #b91c1c;
+  background: #fff1f2 !important;
+}
+
+.panel-head button,
+.todo-add button,
+.hero-actions button,
+.motivation-play,
+.emergency-panel button,
+.finance-record-actions button,
+.sync-code-row button,
+.sync-status button {
+  min-height: 40px;
+  border-radius: 14px;
+  padding: 0 14px;
+}
+
+.panel-head button:not(.ghost):not(.icon),
+.finance-record-actions button:not(.ghost),
+.todo-add button,
+.hero-actions button:not(.ghost) {
+  background: linear-gradient(180deg, #16a4df, #006aa5) !important;
+  color: #fff;
+  box-shadow: 0 9px 18px rgba(0, 106, 165, 0.18);
+}
+
+button.ghost:not(.topbar-action) {
+  color: #006aa5;
+  background: #eff8ff !important;
+  border: 1px solid #d8edff;
+}
+
+.finance-record-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  background: linear-gradient(to top, #fff 72%, rgba(255, 255, 255, 0)) !important;
+}
+
+.finance-record-actions button {
+  min-width: 132px;
+  font-weight: 850;
+}
+
+.topbar button,
+button.topbar-action,
+.mobile-menu-button,
+.drawer-close {
+  color: #fff;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 44%),
+    linear-gradient(180deg, #1aa4e9, #006bb4) !important;
+}
+
+.life-pillars,
+.dashboard-todos {
+  display: none !important;
+}
+
+@media (max-width: 680px) {
+  body {
+    background: #fff !important;
+  }
+
+  main {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .topbar {
+    margin-right: -10px;
+    margin-left: -10px;
+  }
+
+  .stack {
+    gap: 12px;
+  }
+
+  .panel,
+  .metric,
+  .system-hero {
+    padding: 12px;
+    border-radius: 17px;
+  }
+
+  .form-grid,
+  .form-grid.compact,
+  .finance-record-form,
+  .body-record-form {
+    gap: 9px;
+  }
+
+  .field,
+  .toggle,
+  .body-record-form .field,
+  .body-record-form .toggle {
+    padding: 8px 9px;
+  }
+
+  .field input,
+  .field textarea,
+  .field select,
+  .body-record-form .field input,
+  .body-record-form .field textarea,
+  .body-record-form .field select {
+    min-height: 40px;
+    padding: 7px 9px;
+  }
+
+  .field textarea,
+  .hero-content textarea,
+  .body-record-form .field textarea {
+    min-height: 62px;
+  }
+
+  .icon,
+  .form-icon-button {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+  }
+
+  .finance-record-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .finance-record-actions button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

@@ -409,7 +409,7 @@ function App() {
         {notice && <div className="toast">{notice}</div>}
         {!summary && !error && <div className="loading">正在读取本地数据库...</div>}
 
-        {summary && page === 'dashboard' && <Dashboard summary={summary} onNavigate={setPage} onSaved={refresh} notify={notify} />}
+        {summary && page === 'dashboard' && <Dashboard onSaved={refresh} notify={notify} />}
         {summary && page === 'self-control' && <SelfControl summary={summary} onSaved={refresh} notify={notify} />}
         {summary && page === 'finance' && <Finance onSaved={refresh} notify={notify} />}
         {summary && page === 'body' && <Body onSaved={refresh} />}
@@ -430,67 +430,11 @@ function App() {
   );
 }
 
-function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary; onNavigate: (page: string) => void; onSaved: () => void; notify: (message: string) => void }) {
-  const progress = Math.min((summary.finance.total_savings / summary.finance.target) * 100, 100);
-
+function Dashboard({ onSaved, notify }: { onSaved: () => void; notify: (message: string) => void }) {
   return (
     <section className="stack">
-      <div className="grid four metric-grid">
-        <MetricButton icon={<ShieldCheck />} label="禁欲天数" value={`${summary.self_control.days_logged}天`} hint={`中断 ${summary.self_control.breaches} 次`} onClick={() => onNavigate('self-control')} />
-        <MetricButton icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} onClick={() => onNavigate('finance')} />
-        <MetricButton icon={<Dumbbell />} label="近7天运动" value={`${summary.body.exercise_minutes || 0}分钟`} hint={`熬夜 ${summary.body.late_days || 0} 天`} onClick={() => onNavigate('body')} />
-        <MetricButton icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" onClick={() => onNavigate('career')} />
-      </div>
-
-      <DashboardTodos todos={summary.today_todos || []} onSaved={onSaved} notify={notify} />
-
-      <EditableHero summary={summary} onSaved={onSaved} notify={notify} compact />
-
-      <div className="panel">
-        <div className="panel-head">
-          <h3>40万目标</h3>
-          <span>{progress.toFixed(1)}%</span>
-        </div>
-        <div className="progress"><span style={{ width: `${progress}%` }} /></div>
-      </div>
-
-      <div className="life-pillars" aria-label="人生系统四个核心模块">
-        <button onClick={() => onNavigate('self-control')}>
-          <ShieldCheck size={28} />
-          <span>自律打卡</span>
-          <small>养成好习惯</small>
-        </button>
-        <button onClick={() => onNavigate('finance')}>
-          <PiggyBank size={28} />
-          <span>财务自由</span>
-          <small>存钱更有目标</small>
-        </button>
-        <button onClick={() => onNavigate('body')}>
-          <Activity size={28} />
-          <span>健康生活</span>
-          <small>运动饮食管理</small>
-        </button>
-        <button onClick={() => onNavigate('career')}>
-          <BriefcaseBusiness size={28} />
-          <span>事业成长</span>
-          <small>学习与成长</small>
-        </button>
-      </div>
-
       <CalendarPage onSaved={onSaved} notify={notify} embedded />
     </section>
-  );
-}
-
-function DashboardTodos({ todos, onSaved, notify }: { todos: TodoItem[]; onSaved: () => void; notify: (message: string) => void }) {
-  return (
-    <div className="panel dashboard-todos">
-      <div className="panel-head">
-        <h3>今日待办</h3>
-        <span>{todos.filter(todo => todo.is_done).length}/{todos.length} 已完成</span>
-      </div>
-      <EditableTodos date={today()} initialTodos={todos} onSaved={onSaved} notify={notify} />
-    </div>
   );
 }
 
@@ -761,20 +705,6 @@ function Metric({ icon, label, value, hint }: { icon: React.ReactNode; label: st
   );
 }
 
-function MetricButton({ icon, label, value, hint, onClick }: { icon: React.ReactNode; label: string; value: string; hint: string; onClick: () => void }) {
-  return (
-    <button className="metric metric-button" type="button" onClick={onClick} aria-label={`进入${label}`}>
-      <div className="metric-button-top">
-        <div className="metric-icon">{icon}</div>
-        <ChevronRight size={18} />
-      </div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <p>{hint}</p>
-    </button>
-  );
-}
-
 function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
   return <label className={`field ${className}`.trim()}><span>{label}</span>{children}</label>;
 }
@@ -988,21 +918,18 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
           <div className="panel-head">
             <h3>{editingLogId ? '编辑冲动记录' : '冲动记录'}</h3>
             <div className="inline-actions">
-              {editingLogId > 0 && <button className="icon" onClick={resetForm} aria-label="取消编辑" title="取消编辑"><X size={15} /></button>}
-              <button className="icon" onClick={save} aria-label={editingLogId ? '保存修改' : '添加冲动记录'} title={editingLogId ? '保存修改' : '添加冲动记录'}>{editingLogId ? <Save size={15} /> : <Plus size={15} />}</button>
+              {editingLogId > 0 && <button className="icon form-icon-button" onClick={resetForm} aria-label="取消编辑" title="取消编辑"><X size={24} /></button>}
+              <button className="icon form-icon-button" onClick={save} aria-label={editingLogId ? '保存修改' : '添加冲动记录'} title={editingLogId ? '保存修改' : '添加冲动记录'}>{editingLogId ? <Save size={24} /> : <Plus size={24} />}</button>
             </div>
           </div>
           <div className="form-grid compact urge-grid">
             <Field label="时间"><DateInput withTime value={form.logged_at} onChange={logged_at => setForm({ ...form, logged_at })} /></Field>
             <Field label="冲动 1-10"><NumberInput min={1} max={10} value={form.urge_score} onChange={value => setForm({ ...form, urge_score: value })} /></Field>
             <Field label="地点" className="field-wide"><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="卧室 / 客厅 / 公司 / 路上" /></Field>
-            <Field label="冲动前发生了什么" className="field-long"><textarea value={form.before_urge} onChange={e => setForm({ ...form, before_urge: e.target.value })} placeholder="例如：熬夜、刷短视频、压力大、无聊独处" /></Field>
-            <Field label="想获得或逃避什么" className="field-long"><textarea value={form.feeling} onChange={e => setForm({ ...form, feeling: e.target.value })} placeholder="例如：想放松、逃避压力、寻求刺激、缓解孤独" /></Field>
-            <Field label="10分钟延迟动作" className="field-long"><textarea value={form.delay_action} onChange={e => setForm({ ...form, delay_action: e.target.value })} placeholder="例如：离开床、喝水、深蹲20个、冷水洗脸" /></Field>
             <Field label="结果" className="field-long"><textarea value={form.result} onChange={e => setForm({ ...form, result: e.target.value })} placeholder="10分钟后冲动下降了吗？下一步是什么？" /></Field>
           </div>
         </div>
-        <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onEdit={editLog} onDeleted={async () => { await load(); onSaved(); }} />
+        <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'result']} endpoint="/api/urge-logs" onEdit={editLog} onDeleted={async () => { await load(); onSaved(); }} />
       </div>
     </section>
   );
@@ -1352,9 +1279,8 @@ function Body({ onSaved }: { onSaved: () => void }) {
       <Field label="运动分钟"><NumberInput value={form.exercise_minutes} onChange={value => setForm({ ...form, exercise_minutes: value })} /></Field>
       <Field label="睡眠小时"><NumberInput precision={2} value={form.sleep_hours} onChange={sleep_hours => setForm({ ...form, sleep_hours })} placeholder="例如 7.50" /></Field>
       <Toggle label="熬夜" checked={form.stayed_up_late} onChange={v => setForm({ ...form, stayed_up_late: v })} />
-      <Toggle label="完成体态训练" checked={form.posture_training} onChange={v => setForm({ ...form, posture_training: v })} />
       <Field label="备注" className="field-wide"><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="今天身体状态、疼痛、疲劳、训练感受" /></Field>
-    </>} onSave={save} table={<DataTable title="身体记录" rows={rows} columns={['entry_date', 'weight', 'exercise_type', 'exercise_minutes', 'sleep_hours', 'stayed_up_late', 'posture_training', 'note']} endpoint="/api/body" onDeleted={load} />} />
+    </>} onSave={save} table={<DataTable title="身体记录" rows={rows} columns={['entry_date', 'weight', 'exercise_type', 'exercise_minutes', 'sleep_hours', 'stayed_up_late', 'note']} endpoint="/api/body" onDeleted={load} />} />
   </section>;
 }
 
