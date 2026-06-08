@@ -3811,3 +3811,706 @@ tbody tr {
       linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 246, 239, 0.94));
   }
 }
+
+/* final v17: premium app UI aligned with campaign references */
+:root {
+  --life-blue: #006fbd;
+  --life-blue-deep: #004f9d;
+  --life-blue-dark: #003f82;
+  --life-green: #16834d;
+  --life-green-soft: #e7f7ee;
+  --life-orange: #f18718;
+  --life-purple: #6c4cc2;
+  --life-gold: #f5d48a;
+  --life-ink: #161b22;
+  --life-copy: #65727d;
+  --life-paper: #fffdfa;
+  --life-card: rgba(255, 255, 255, 0.94);
+  --life-card-border: rgba(255, 255, 255, 0.84);
+  --life-card-shadow:
+    0 18px 34px rgba(54, 31, 12, 0.16),
+    inset 0 1px rgba(255, 255, 255, 0.94);
+}
+
+html {
+  background: #0b3559;
+}
+
+body {
+  color: var(--life-ink);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(180, 218, 158, 0.18), transparent 16rem),
+    radial-gradient(circle at 92% 18%, rgba(255, 218, 148, 0.18), transparent 18rem),
+    linear-gradient(180deg, rgba(5, 39, 70, 0.98) 0 16rem, transparent 16rem),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), transparent 18%, rgba(0, 0, 0, 0.05) 21%, transparent 35%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0 2px, rgba(0, 0, 0, 0.035) 2px 5px, transparent 5px 30px),
+    linear-gradient(105deg, #65300f, #965522 38%, #bf813b 64%, #743a15);
+}
+
+.app {
+  background:
+    radial-gradient(circle at 50% 0, rgba(255, 255, 255, 0.14), transparent 23rem),
+    linear-gradient(180deg, rgba(0, 50, 94, 0.34), transparent 18rem);
+}
+
+main {
+  max-width: 1320px;
+}
+
+.topbar {
+  min-height: 82px;
+  border-bottom: 1px solid rgba(0, 47, 92, 0.45);
+  background:
+    radial-gradient(circle at 18% 0, rgba(116, 196, 255, 0.36), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    linear-gradient(180deg, #0e94dc 0%, var(--life-blue) 47%, var(--life-blue-deep) 100%);
+  box-shadow:
+    0 12px 26px rgba(0, 44, 90, 0.3),
+    inset 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.topbar h1 {
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.topbar-page-kicker,
+.topbar p {
+  color: rgba(255, 245, 218, 0.82);
+  font-weight: 650;
+}
+
+.topbar button,
+button.topbar-action,
+.mobile-menu-button,
+.drawer-close {
+  border-radius: 16px;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 44%),
+    linear-gradient(180deg, #1aa4e9, #006bb4);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.28),
+    0 8px 18px rgba(0, 48, 98, 0.28);
+}
+
+.sidebar {
+  background:
+    radial-gradient(circle at 30% 0, rgba(255, 217, 141, 0.14), transparent 16rem),
+    linear-gradient(180deg, rgba(75, 42, 18, 0.92), rgba(46, 25, 12, 0.9)),
+    repeating-linear-gradient(90deg, #744017 0 26px, #8d5220 26px 52px, #693615 52px 78px);
+}
+
+nav button {
+  border-radius: 17px;
+  background: rgba(56, 30, 13, 0.38);
+}
+
+nav button.active,
+nav button:hover {
+  background: rgba(92, 52, 23, 0.76);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, 0.1),
+    inset 4px 0 var(--life-gold);
+}
+
+.hero,
+.panel,
+.metric,
+.note-card,
+.sync-card {
+  border-color: var(--life-card-border);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 92% 0, rgba(211, 236, 255, 0.35), transparent 33%),
+    linear-gradient(180deg, var(--life-card), rgba(250, 247, 240, 0.94));
+  box-shadow: var(--life-card-shadow);
+}
+
+.hero {
+  min-height: 138px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(129, 202, 253, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 246, 240, 0.94));
+}
+
+.hero::before {
+  height: 0;
+}
+
+.hero h2 {
+  color: var(--life-ink);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.hero p,
+.metric p,
+.metric span,
+.panel-head span,
+.calendar-toolbar p,
+.calendar-detail p {
+  color: var(--life-copy);
+}
+
+.panel-head {
+  border-bottom-color: rgba(0, 93, 160, 0.09);
+}
+
+.panel-head h3 {
+  color: var(--life-ink);
+  font-weight: 900;
+}
+
+.panel-head h3::before {
+  background: linear-gradient(180deg, #32aef0, var(--life-blue));
+}
+
+.metric {
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 92% 0, rgba(197, 231, 255, 0.22), transparent 32%),
+    linear-gradient(180deg, #ffffff, #f9f7f1);
+}
+
+.metric-icon {
+  border-radius: 15px;
+  color: var(--life-blue);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), transparent 42%),
+    linear-gradient(180deg, #eaf7ff, #93d4ff);
+  box-shadow:
+    0 9px 20px rgba(0, 112, 189, 0.16),
+    inset 0 1px rgba(255, 255, 255, 0.92);
+}
+
+.metric-grid .metric:nth-child(1) .metric-icon {
+  color: #0b67ba;
+  background: linear-gradient(180deg, #eef8ff, #b8defd);
+}
+
+.metric-grid .metric:nth-child(2) .metric-icon {
+  color: var(--life-green);
+  background: linear-gradient(180deg, #e8f8ee, #9de0b6);
+}
+
+.metric-grid .metric:nth-child(3) .metric-icon {
+  color: var(--life-orange);
+  background: linear-gradient(180deg, #fff4e6, #ffc47a);
+}
+
+.metric-grid .metric:nth-child(4) .metric-icon {
+  color: var(--life-blue);
+  background: linear-gradient(180deg, #edf7ff, #9bd5ff);
+}
+
+.metric span {
+  font-weight: 850;
+}
+
+.metric strong {
+  color: #101418;
+  letter-spacing: -0.045em;
+}
+
+.metric-button:hover,
+.metric-button:focus-visible {
+  border-color: rgba(0, 111, 189, 0.24);
+  background:
+    radial-gradient(circle at 92% 0, rgba(207, 236, 255, 0.34), transparent 36%),
+    linear-gradient(180deg, #ffffff, #f0f8ff);
+  box-shadow:
+    0 20px 36px rgba(0, 70, 130, 0.16),
+    inset 0 1px rgba(255, 255, 255, 0.92);
+}
+
+.panel-head button,
+button.ghost:not(.topbar-action),
+.todo-add button,
+.hero-actions button,
+.motivation-play,
+.emergency-panel button {
+  border-radius: 15px;
+}
+
+.field input,
+.field textarea,
+.field select,
+.hero-content input,
+.hero-content textarea,
+.todo-add input,
+.note-search input,
+.sync-code-row input {
+  border-radius: 16px;
+  border-color: rgba(18, 96, 154, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 252, 255, 0.96));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.95),
+    inset 0 -1px rgba(0, 81, 140, 0.05),
+    0 7px 16px rgba(37, 48, 58, 0.06);
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus,
+.hero-content input:focus,
+.hero-content textarea:focus,
+.todo-add input:focus,
+.note-search input:focus,
+.sync-code-row input:focus {
+  border-color: rgba(0, 111, 189, 0.62);
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 1),
+    0 0 0 4px rgba(0, 111, 189, 0.12),
+    0 12px 24px rgba(0, 86, 150, 0.12);
+}
+
+.finance-pie {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.92),
+    0 14px 28px rgba(0, 88, 156, 0.14);
+}
+
+.finance-account,
+.expense-ranking-row,
+.todo,
+.checklist button,
+.route button,
+.calendar-cell {
+  border-radius: 17px;
+}
+
+.table-wrap {
+  border-radius: 18px;
+}
+
+.icon {
+  border-radius: 13px;
+  background: linear-gradient(180deg, #f0f9ff, #dff2ff);
+}
+
+.life-pillars {
+  border-color: rgba(255, 218, 147, 0.24);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 221, 150, 0.16), transparent 44%),
+    linear-gradient(180deg, rgba(70, 40, 18, 0.92), rgba(47, 27, 13, 0.88));
+}
+
+.life-pillars svg {
+  color: var(--life-gold);
+}
+
+.mobile-tabbar {
+  border-color: rgba(255, 255, 255, 0.84);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(248, 247, 242, 0.92));
+}
+
+.mobile-tabbar button.active {
+  color: var(--life-blue);
+  background: linear-gradient(180deg, #eef9ff, #d8efff);
+}
+
+@media (min-width: 981px) {
+  .app {
+    grid-template-columns: 286px minmax(0, 1fr);
+  }
+
+  main {
+    padding: 30px;
+  }
+
+  .topbar {
+    margin: -30px -30px 28px;
+    padding-right: 30px;
+    padding-left: 30px;
+  }
+}
+
+@media (max-width: 680px) {
+  body {
+    background:
+      radial-gradient(circle at 8% 5%, rgba(180, 218, 158, 0.16), transparent 10rem),
+      linear-gradient(180deg, rgba(5, 47, 83, 0.98) 0 10rem, transparent 10rem),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 18%, rgba(0, 0, 0, 0.04) 21%, transparent 35%),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.055) 0 2px, rgba(0, 0, 0, 0.035) 2px 5px, transparent 5px 30px),
+      linear-gradient(105deg, #65300f, #965522 36%, #bf813b 64%, #743a15);
+  }
+
+  main {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .topbar {
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+    font-weight: 900;
+  }
+
+  .drawer-close,
+  .mobile-menu-button,
+  .topbar-action {
+    width: 48px;
+    height: 48px;
+    border-radius: 15px;
+  }
+
+  .hero,
+  .panel,
+  .metric,
+  .note-card,
+  .sync-card {
+    border-radius: 20px;
+  }
+
+  .metric-grid .metric {
+    min-height: 138px;
+  }
+
+  .metric-grid .metric-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .mobile-tabbar {
+    right: 12px;
+    left: 12px;
+    border-radius: 22px;
+  }
+}
+
+/* final v18: structural parity with generated app prototypes */
+.topbar-title > div {
+  gap: 5px;
+}
+
+.topbar-page-kicker {
+  max-width: min(58vw, 520px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-todos .todo-editor {
+  gap: 10px;
+}
+
+.dashboard-todos .todo-feedback,
+.dashboard-todos .todo-add {
+  display: none;
+}
+
+.dashboard-todos .todo-list.editable {
+  gap: 0;
+}
+
+.daily-quote {
+  min-height: 92px;
+  padding: 18px 22px;
+}
+
+.daily-quote .hero-content {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 14px;
+  align-items: center;
+}
+
+.daily-quote .hero-content::before {
+  content: "☀";
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fff5d8, #ffd36c);
+  color: #ef9500;
+  font-size: 28px;
+}
+
+.daily-quote p {
+  grid-column: 2;
+  font-size: 13px;
+}
+
+.daily-quote h2 {
+  grid-column: 2;
+  margin: 0;
+  font-size: clamp(18px, 4.8vw, 24px);
+  letter-spacing: 0;
+}
+
+.daily-quote .hero-actions {
+  align-self: center;
+}
+
+.system-hero {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-height: 104px;
+  padding: 18px 20px;
+  border: 1px solid var(--life-card-border);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 90% 12%, rgba(132, 202, 255, 0.2), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 247, 242, 0.94));
+  box-shadow: var(--life-card-shadow);
+}
+
+.system-hero h3,
+.system-hero p {
+  margin: 0;
+}
+
+.system-hero h3 {
+  color: var(--life-ink);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.system-hero p {
+  color: var(--life-copy);
+  line-height: 1.55;
+}
+
+.system-hero.self-hero {
+  display: block;
+  min-height: 92px;
+  padding: 20px 22px;
+  color: #0e4d80;
+}
+
+.system-hero.self-hero p {
+  color: #1a4e77;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.system-hero.self-hero p::before,
+.system-hero.self-hero p::after {
+  color: rgba(32, 125, 190, 0.28);
+  font-size: 34px;
+  font-weight: 900;
+  vertical-align: -9px;
+}
+
+.system-hero.self-hero p::before {
+  content: "“";
+  margin-right: 12px;
+}
+
+.system-hero.self-hero p::after {
+  content: "”";
+  margin-left: 12px;
+}
+
+.system-hero.self-hero span {
+  display: block;
+  margin-top: 10px;
+  color: rgba(13, 105, 167, 0.72);
+  font-size: 13px;
+  text-align: right;
+}
+
+.body-hero .metric-icon {
+  color: var(--life-orange);
+  background: linear-gradient(180deg, #fff2df, #ffc476);
+}
+
+.career-hero .metric-icon {
+  color: var(--life-blue);
+}
+
+.self-action-list {
+  display: grid;
+  gap: 12px;
+}
+
+.self-action-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 86px;
+  padding: 14px 16px;
+}
+
+.self-action-card h3,
+.self-action-card p,
+.self-action-card small {
+  margin: 0;
+}
+
+.self-action-card h3 {
+  color: var(--life-ink);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.self-action-card p {
+  margin-top: 3px;
+  color: var(--life-copy);
+  font-size: 13px;
+}
+
+.self-action-card small {
+  display: block;
+  margin-top: 4px;
+  color: #7a858c;
+  font-size: 12px;
+}
+
+.self-action-card button {
+  min-width: 72px;
+  min-height: 42px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #139bd8, #006aa5);
+  color: #fff;
+  font-weight: 850;
+  box-shadow: 0 9px 18px rgba(0, 91, 144, 0.18);
+}
+
+.self-control-workspace {
+  align-items: start;
+}
+
+.progress-metric {
+  gap: 7px;
+}
+
+.mini-progress {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfe6ea;
+}
+
+.mini-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0878c7, #21a8e8);
+}
+
+.tone-orange .metric-icon {
+  color: var(--life-orange);
+  background: linear-gradient(180deg, #fff0df, #ffc06f);
+}
+
+.tone-orange .mini-progress i {
+  background: linear-gradient(90deg, #f18615, #ffb248);
+}
+
+.tone-purple .metric-icon {
+  color: var(--life-purple);
+  background: linear-gradient(180deg, #f1edff, #c1b0ff);
+}
+
+.tone-purple .mini-progress i {
+  background: linear-gradient(90deg, #6848be, #987fe3);
+}
+
+.route button {
+  min-height: 72px;
+}
+
+.route button small {
+  background: linear-gradient(180deg, #eff9ff, #dff2ff);
+}
+
+@media (max-width: 680px) {
+  .topbar {
+    min-height: calc(66px + env(safe-area-inset-top));
+  }
+
+  .topbar-page-kicker {
+    display: none;
+    max-width: calc(100vw - 142px);
+    color: rgba(255, 245, 218, 0.84);
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .topbar h1 {
+    max-width: calc(100vw - 142px);
+  }
+
+  .dashboard-todos .todo {
+    min-height: 48px;
+    padding: 9px 0;
+  }
+
+  .daily-quote {
+    padding: 14px 16px;
+  }
+
+  .daily-quote .hero-actions {
+    display: none;
+  }
+
+  .system-hero {
+    min-height: 92px;
+    padding: 16px;
+  }
+
+  .system-hero h3 {
+    font-size: 17px;
+  }
+
+  .system-hero p {
+    font-size: 13px;
+  }
+
+  .system-hero.self-hero p {
+    font-size: 15px;
+  }
+
+  .self-action-card {
+    grid-template-columns: auto 1fr auto;
+    min-height: 78px;
+    padding: 12px;
+  }
+
+  .self-action-card .metric-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .self-action-card h3 {
+    font-size: 16px;
+  }
+
+  .self-action-card p {
+    display: none;
+  }
+
+  .self-action-card button {
+    min-width: 66px;
+    min-height: 38px;
+    padding: 0 12px;
+  }
+
+  .self-control-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-metric .mini-progress {
+    margin-top: 2px;
+  }
+
+  .career-metrics .metric {
+    min-height: 154px;
+  }
+}

@@ -14,7 +14,6 @@ import {
   Dumbbell,
   Home,
   Menu,
-  Play,
   PiggyBank,
   Plus,
   Pencil,
@@ -186,6 +185,16 @@ function apiUrl(path: string): string {
 const today = () => new Date().toISOString().slice(0, 10);
 const money = (value: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const recordStartDate = '2026-06-01';
+const pageSubtitles: Record<string, string> = {
+  dashboard: '规划 · 自律 · 成长 · 财务自由',
+  'self-control': '选择更好的未来，守住当下',
+  finance: '清晰管理每一笔存款，稳步实现财务目标',
+  body: '健康数据追踪，运动饮食管理',
+  career: '长期主义，学习与成长',
+  notes: '沉淀想法，记录人生感悟',
+  reviews: '复盘分析，持续提升',
+  settings: '账号同步与应用配置',
+};
 const columnLabels: Record<string, string> = {
   logged_at: '时间',
   urge_score: '冲动分',
@@ -386,7 +395,7 @@ function App() {
           <div className="topbar-title">
             <button className="mobile-menu-button" aria-label="打开菜单" onClick={() => setDrawerOpen(true)}><Menu size={20} /></button>
             <div>
-              <p className="topbar-page-kicker">{recordStartDate} 起持续记录</p>
+              <p className="topbar-page-kicker">{pageSubtitles[page] || `${recordStartDate} 起持续记录`}</p>
               <h1><Cloud className="app-title-cloud" size={25} />{nav.find(([id]) => id === page)?.[1]}</h1>
             </div>
           </div>
@@ -426,8 +435,6 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
 
   return (
     <section className="stack">
-      <EditableHero summary={summary} onSaved={onSaved} notify={notify} />
-
       <div className="grid four metric-grid">
         <MetricButton icon={<ShieldCheck />} label="禁欲天数" value={`${summary.self_control.days_logged}天`} hint={`中断 ${summary.self_control.breaches} 次`} onClick={() => onNavigate('self-control')} />
         <MetricButton icon={<PiggyBank />} label="存款进度" value={money(summary.finance.total_savings)} hint={`还差 ${money(summary.finance.remaining)}`} onClick={() => onNavigate('finance')} />
@@ -435,7 +442,9 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
         <MetricButton icon={<BriefcaseBusiness />} label="近7天事业学习" value={`${summary.career.career_minutes || 0}分钟`} hint="目标每周至少175分钟" onClick={() => onNavigate('career')} />
       </div>
 
-      <CalendarPage onSaved={onSaved} notify={notify} embedded />
+      <DashboardTodos todos={summary.today_todos || []} onSaved={onSaved} notify={notify} />
+
+      <EditableHero summary={summary} onSaved={onSaved} notify={notify} compact />
 
       <div className="panel">
         <div className="panel-head">
@@ -467,11 +476,25 @@ function Dashboard({ summary, onNavigate, onSaved, notify }: { summary: Summary;
           <small>学习与成长</small>
         </button>
       </div>
+
+      <CalendarPage onSaved={onSaved} notify={notify} embedded />
     </section>
   );
 }
 
-function EditableHero({ summary, onSaved, notify }: { summary: Summary; onSaved: () => void; notify: (message: string) => void }) {
+function DashboardTodos({ todos, onSaved, notify }: { todos: TodoItem[]; onSaved: () => void; notify: (message: string) => void }) {
+  return (
+    <div className="panel dashboard-todos">
+      <div className="panel-head">
+        <h3>今日待办</h3>
+        <span>{todos.filter(todo => todo.is_done).length}/{todos.length} 已完成</span>
+      </div>
+      <EditableTodos date={today()} initialTodos={todos} onSaved={onSaved} notify={notify} />
+    </div>
+  );
+}
+
+function EditableHero({ summary, onSaved, notify, compact = false }: { summary: Summary; onSaved: () => void; notify: (message: string) => void; compact?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(summary.settings.today_goal_title || '今天的目标');
   const [text, setText] = useState(summary.settings.today_goal_text || '先完成系统，不追求完美。');
@@ -492,7 +515,7 @@ function EditableHero({ summary, onSaved, notify }: { summary: Summary; onSaved:
   };
 
   return (
-    <div className="hero editable-hero">
+    <div className={`hero editable-hero ${compact ? 'daily-quote' : ''}`.trim()}>
       <div className="hero-content">
         {editing ? (
           <>
@@ -929,13 +952,38 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
 
   return (
     <section className="stack">
-      <div className="grid four metric-grid">
-        <Metric icon={<ShieldCheck />} label="禁欲天数" value={`${summary.self_control.days_logged}天`} hint="破戒后自动清零重算" />
-        <Metric icon={<Activity />} label="中断次数" value={`${summary.self_control.breaches}次`} hint="按冲动记录条数统计" />
-        <Metric icon={<ShieldCheck />} label="最高冲动分" value={`${maxUrgeScore(logs)}/10`} hint="来自冲动记录" />
-        <Metric icon={<BarChart3 />} label="本周冲动" value={`${weeklyUrgeCount(logs)}条`} hint="最近7天记录" />
+      <div className="system-hero self-hero">
+        <p>“自控不是压抑，而是选择更好的未来。”</p>
+        <span>— 人生系统</span>
       </div>
-      <div className="grid two">
+      <div className="grid four metric-grid">
+        <Metric icon={<ShieldCheck />} label="连续守住" value={`${summary.self_control.days_logged}天`} hint="破戒后自动清零重算" />
+        <Metric icon={<CheckCircle2 />} label="本月记录" value={`${Math.min(summary.self_control.days_logged, 30)}/30天`} hint="目标 30 天" />
+        <Metric icon={<Activity />} label="中断次数" value={`${summary.self_control.breaches}次`} hint="按冲动记录条数统计" />
+        <Metric icon={<BarChart3 />} label="今日冲动" value={`${maxUrgeScore(logs.filter(log => String(log.logged_at || '').slice(0, 10) === today()))}/10`} hint="冲动次数上限" />
+      </div>
+      <div className="self-action-list">
+        <div className="panel self-action-card motivation-panel">
+          <div className="metric-icon"><Volume2 size={22} /></div>
+          <div>
+            <h3>守住当下</h3>
+            <p>专注音频 · 平静心绪 · 增强自控</p>
+            <small>{isPlaying ? '正在播放' : motivationTracks[motivationIndex].text}</small>
+          </div>
+          <button onClick={playMotivation}>{isPlaying ? '换一段' : '播放'}</button>
+          <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+        </div>
+        <div className={`panel self-action-card emergency-panel ${emergencySeconds !== null ? 'active' : ''}`}>
+          <div className="metric-icon"><TimerReset size={22} /></div>
+          <div>
+            <h3>10分钟应急模式</h3>
+            <p>{emergencySeconds === null ? '当冲动来袭时，立即启动应急模式' : '先离开环境，再完成替代动作'}</p>
+            {emergencySeconds !== null && <small>{formatCountdown(emergencySeconds)}</small>}
+          </div>
+          <button onClick={() => emergencySeconds === null ? setEmergencySeconds(600) : setEmergencySeconds(null)}>{emergencySeconds === null ? '立即启动' : '结束'}</button>
+        </div>
+      </div>
+      <div className="grid two self-control-workspace">
         <div className="panel" ref={formPanelRef}>
           <div className="panel-head">
             <h3>{editingLogId ? '编辑冲动记录' : '冲动记录'}</h3>
@@ -954,22 +1002,8 @@ function SelfControl({ summary, onSaved, notify }: { summary: Summary; onSaved: 
             <Field label="结果" className="field-long"><textarea value={form.result} onChange={e => setForm({ ...form, result: e.target.value })} placeholder="10分钟后冲动下降了吗？下一步是什么？" /></Field>
           </div>
         </div>
-        <div className="stack">
-          <div className="panel motivation-panel">
-            <div className="panel-head"><h3>守住当下</h3><span>随机激励语音</span></div>
-            <p>{motivationTracks[motivationIndex].text}</p>
-            <button className="motivation-play" onClick={playMotivation}><Volume2 size={18} /> {isPlaying ? '随机播放另一段' : '播放一段激励语音'}</button>
-            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
-          </div>
-          <div className={`panel emergency-panel ${emergencySeconds !== null ? 'active' : ''}`}>
-            <div className="panel-head"><h3>10 分钟应急模式</h3><TimerReset size={19} /></div>
-            {emergencySeconds === null
-              ? <><p>冲动出现时立即启动。先离开触发环境，再完成一个替代动作。</p><button onClick={() => setEmergencySeconds(600)}><Play size={17} /> 启动应急模式</button></>
-              : <><strong className="emergency-timer">{formatCountdown(emergencySeconds)}</strong><div className="emergency-actions"><span>1. 离开当前环境</span><span>2. 手机放到远处</span><span>3. 喝水、散步或深蹲</span></div><button className="ghost" onClick={() => setEmergencySeconds(null)}>结束应急模式</button></>}
-          </div>
-        </div>
+        <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onEdit={editLog} onDeleted={async () => { await load(); onSaved(); }} />
       </div>
-      <DataTable title="最近冲动记录" rows={logs} columns={['logged_at', 'urge_score', 'location', 'before_urge', 'result']} endpoint="/api/urge-logs" onEdit={editLog} onDeleted={async () => { await load(); onSaved(); }} />
     </section>
   );
 }
@@ -1291,7 +1325,25 @@ function Body({ onSaved }: { onSaved: () => void }) {
     setForm({ ...form, exercise_type: '', exercise_minutes: 0, note: '' });
     await load(); onSaved();
   };
+  const latestBody = rows[0];
+  const latestWeight = latestBody?.weight ?? null;
+  const latestSleep = latestBody?.sleep_hours ?? null;
+  const recentExercise = rows.slice(0, 7).reduce((sum, row) => sum + Number(row.exercise_minutes || 0), 0);
+  const lateDays = rows.slice(0, 7).reduce((sum, row) => sum + Number(row.stayed_up_late || 0), 0);
   return <section className="stack">
+    <div className="system-hero body-hero">
+      <div className="metric-icon"><Dumbbell size={24} /></div>
+      <div>
+        <h3>健康是人生的 1，其他都是后面的 0。</h3>
+        <p>保持规律运动和饮食，有助于体重管理。</p>
+      </div>
+    </div>
+    <div className="grid four metric-grid">
+      <Metric icon={<Dumbbell />} label="今日体重" value={latestWeight === null ? '--' : `${Number(latestWeight).toFixed(1)}kg`} hint={latestBody ? `记录于 ${latestBody.entry_date}` : '等待记录'} />
+      <Metric icon={<Activity />} label="近7天运动" value={`${recentExercise}分钟`} hint={`日均 ${Math.round(recentExercise / 7)} 分钟`} />
+      <Metric icon={<TimerReset />} label="睡眠" value={latestSleep === null ? '--' : `${Number(latestSleep).toFixed(1)}小时`} hint="最近一次记录" />
+      <Metric icon={<Activity />} label="熬夜" value={`${lateDays}天`} hint="最近7天统计" />
+    </div>
     <WeightTrend rows={rows} />
     <RecordPage title="新增身体记录" button="保存记录" className="body-record-form" form={<>
       <Field label="日期"><DateInput value={form.entry_date} onChange={entry_date => setForm({ ...form, entry_date })} /></Field>
@@ -1345,7 +1397,27 @@ function Career({ onSaved }: { onSaved: () => void }) {
     setForm({ ...form, topic: '', output: '', project_scene: '', next_step: '' });
     await load(); onSaved();
   };
+  const todayMinutes = rows.filter(row => row.entry_date === today()).reduce((sum, row) => sum + Number(row.learning_minutes || 0), 0);
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 6);
+  const week = formatLocalDate(weekStart);
+  const weekMinutes = rows.filter(row => row.entry_date >= week).reduce((sum, row) => sum + Number(row.learning_minutes || 0), 0);
+  const outputCount = rows.filter(row => row.output?.trim()).length;
+  const projectCount = new Set(rows.map(row => row.project_scene?.trim()).filter(Boolean)).size;
   return <section className="stack">
+    <div className="system-hero career-hero">
+      <div className="metric-icon"><BriefcaseBusiness size={24} /></div>
+      <div>
+        <h3>长期主义，复利成长</h3>
+        <p>每天进步一点点，未来感谢现在的你。</p>
+      </div>
+    </div>
+    <div className="grid four metric-grid career-metrics">
+      <ProgressMetric icon={<BookOpen />} label="今日学习" value={`${todayMinutes}分钟`} hint="目标 60 分钟" progress={Math.min(todayMinutes / 60, 1)} />
+      <ProgressMetric icon={<BarChart3 />} label="本周学习" value={`${weekMinutes}分钟`} hint="目标 300 分钟" progress={Math.min(weekMinutes / 300, 1)} />
+      <ProgressMetric icon={<Save />} label="输出笔记" value={`${outputCount}篇`} hint="累计输出" progress={Math.min(outputCount / 8, 1)} tone="orange" />
+      <ProgressMetric icon={<BriefcaseBusiness />} label="进行项目" value={`${projectCount}个`} hint="项目场景沉淀" progress={Math.min(projectCount / 3, 1)} tone="purple" />
+    </div>
     <div className="panel">
       <div className="panel-head"><h3>6个月路线重点</h3></div>
       <div className="route">
@@ -1367,6 +1439,18 @@ function Career({ onSaved }: { onSaved: () => void }) {
     </>} onSave={save} table={<DataTable title="事业记录" rows={rows} columns={['entry_date', 'topic', 'learning_minutes', 'output', 'project_scene', 'next_step']} endpoint="/api/career" onDeleted={load} />} />
     {selectedRoute && <RouteModal route={selectedRoute} onClose={() => setSelectedRoute(null)} />}
   </section>;
+}
+
+function ProgressMetric({ icon, label, value, hint, progress, tone = 'blue' }: { icon: React.ReactNode; label: string; value: string; hint: string; progress: number; tone?: 'blue' | 'orange' | 'purple' }) {
+  return (
+    <div className={`metric progress-metric tone-${tone}`}>
+      <div className="metric-icon">{icon}</div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <p>{hint}</p>
+      <div className="mini-progress"><i style={{ width: `${Math.max(0, Math.min(progress, 1)) * 100}%` }} /></div>
+    </div>
+  );
 }
 
 function RouteModal({ route, onClose }: { route: typeof careerRouteDetails[number]; onClose: () => void }) {
